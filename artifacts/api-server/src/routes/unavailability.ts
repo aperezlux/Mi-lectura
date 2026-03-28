@@ -1,0 +1,116 @@
+import { Router, type IRouter } from "express";
+import { db } from "@workspace/db";
+import { unavailabilityTable, readersTable, insertUnavailabilitySchema } from "@workspace/db/schema";
+import { eq, and } from "drizzle-orm";
+
+const router: IRouter = Router();
+
+router.get("/unavailability", async (req, res) => {
+  try {
+    const readerIdParam = req.query.readerId;
+    let query = db
+      .select({
+        id: unavailabilityTable.id,
+        readerId: unavailabilityTable.readerId,
+        blockedDate: unavailabilityTable.blockedDate,
+        readerName: readersTable.name,
+      })
+      .from(unavailabilityTable)
+      .leftJoin(readersTable, eq(unavailabilityTable.readerId, readersTable.id));
+
+    if (readerIdParam) {
+      const readerId = parseInt(readerIdParam as string);
+      if (!isNaN(readerId)) {
+        const rows = await db
+          .select({
+            id: unavailabilityTable.id,
+            readerId: unavailabilityTable.readerId,
+            blockedDate: unavailabilityTable.blockedDate,
+            readerName: readersTable.name,
+          })
+          .from(unavailabilityTable)
+          .leftJoin(readersTable, eq(unavailabilityTable.readerId, readersTable.id))
+          .where(eq(unavailabilityTable.readerId, readerId));
+        res.json(rows);
+        return;
+      }
+    }
+
+    const rows = await query;
+    res.json(rows);
+  } catch (err) {
+    req.log.error({ err }, "Failed to get unavailability");
+    res.status(500).json({ error: "Error al obtener indisponibilidades" });
+  }
+});
+
+router.post("/unavailability", async (req, res) => {
+  try {
+    const parsed = insertUnavailabilitySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Datos inválidos", details: parsed.error.message });
+      return;
+    }
+
+    const existing = await db
+      .select()
+      .from(unavailabilityTable)
+      .where(
+        and(
+          eq(unavailabilityTable.readerId, parsed.data.readerId),
+          eq(unavailabilityTable.blockedDate, parsed.data.blockedDate)
+        )
+      )
+      .limit(1);
+
+    if (existing.length > 0) {
+      const [row] = await db
+        .select({
+          id: unavailabilityTable.id,
+          readerId: unavailabilityTable.readerId,
+          blockedDate: unavailabilityTable.blockedDate,
+          readerName: readersTable.name,
+        })
+        .from(unavailabilityTable)
+        .leftJoin(readersTable, eq(unavailabilityTable.readerId, readersTable.id))
+        .where(eq(unavailabilityTable.id, existing[0].id))
+        .limit(1);
+      res.status(201).json(row);
+      return;
+    }
+
+    const [inserted] = await db.insert(unavailabilityTable).values(parsed.data).returning();
+    const [row] = await db
+      .select({
+        id: unavailabilityTable.id,
+        readerId: unavailabilityTable.readerId,
+        blockedDate: unavailabilityTable.blockedDate,
+        readerName: readersTable.name,
+      })
+      .from(unavailabilityTable)
+      .leftJoin(readersTable, eq(unavailabilityTable.readerId, readersTable.id))
+      .where(eq(unavailabilityTable.id, inserted.id))
+      .limit(1);
+    res.status(201).json(row);
+  } catch (err) {
+    req.log.error({ err }, "Failed to create unavailability");
+    res.status(500).json({ error: "Error al registrar indisponibilidad" });
+  }
+});
+
+router.delete("/unavailability/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      res.status(400).json({ error: "ID inválido" });
+      return;
+    }
+    await db.delete(unavailabilityTable).where(eq(unavailabilityTable.id, id));
+    res.status(204).send();
+  } catch (err) {
+    req.log.error({ err }, "Failed to delete unavailability");
+    res.status(500).json({ error: "Error al eliminar indisponibilidad" });
+  }
+});
+
+export default router;

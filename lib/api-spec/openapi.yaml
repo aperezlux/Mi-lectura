@@ -1,22 +1,26 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: LiturgiaFlow Pro API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: readers
+    description: Reader management
+  - name: unavailability
+    description: Reader unavailability management
+  - name: calendar
+    description: Liturgical calendar and assignments
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +28,244 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /readers:
+    get:
+      operationId: getReaders
+      tags: [readers]
+      summary: Get all readers
+      responses:
+        "200":
+          description: List of readers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Reader"
+    post:
+      operationId: createReader
+      tags: [readers]
+      summary: Create a new reader
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReaderInput"
+      responses:
+        "201":
+          description: Created reader
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reader"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /readers/{id}:
+    put:
+      operationId: updateReader
+      tags: [readers]
+      summary: Update a reader
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateReaderInput"
+      responses:
+        "200":
+          description: Updated reader
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reader"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteReader
+      tags: [readers]
+      summary: Delete a reader
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /unavailability:
+    get:
+      operationId: getUnavailability
+      tags: [unavailability]
+      summary: Get all unavailability records
+      parameters:
+        - name: readerId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of unavailability records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Unavailability"
+    post:
+      operationId: createUnavailability
+      tags: [unavailability]
+      summary: Block a date for a reader
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUnavailabilityInput"
+      responses:
+        "201":
+          description: Created unavailability
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Unavailability"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /unavailability/{id}:
+    delete:
+      operationId: deleteUnavailability
+      tags: [unavailability]
+      summary: Remove an unavailability record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /calendar:
+    get:
+      operationId: getCalendar
+      tags: [calendar]
+      summary: Get calendar assignments
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Calendar assignments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CalendarEntry"
+
+  /calendar/generate:
+    post:
+      operationId: generateCalendar
+      tags: [calendar]
+      summary: Generate calendar assignments for a period
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateCalendarInput"
+      responses:
+        "200":
+          description: Generated assignments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CalendarEntry"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /calendar/{id}:
+    put:
+      operationId: updateCalendarEntry
+      tags: [calendar]
+      summary: Update a calendar entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCalendarEntryInput"
+      responses:
+        "200":
+          description: Updated calendar entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalendarEntry"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteCalendarEntry
+      tags: [calendar]
+      summary: Delete a calendar entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +276,155 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        details:
+          type: string
+      required:
+        - error
+
+    Reader:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        whatsapp:
+          type: string
+        level:
+          type: string
+          enum: [Principiante, Experto]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - whatsapp
+        - level
+        - createdAt
+
+    CreateReaderInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        whatsapp:
+          type: string
+          minLength: 7
+          maxLength: 20
+        level:
+          type: string
+          enum: [Principiante, Experto]
+      required:
+        - name
+        - whatsapp
+        - level
+
+    UpdateReaderInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        whatsapp:
+          type: string
+          minLength: 7
+          maxLength: 20
+        level:
+          type: string
+          enum: [Principiante, Experto]
+
+    Unavailability:
+      type: object
+      properties:
+        id:
+          type: integer
+        readerId:
+          type: integer
+        blockedDate:
+          type: string
+          format: date
+        readerName:
+          type: string
+      required:
+        - id
+        - readerId
+        - blockedDate
+
+    CreateUnavailabilityInput:
+      type: object
+      properties:
+        readerId:
+          type: integer
+        blockedDate:
+          type: string
+          format: date
+      required:
+        - readerId
+        - blockedDate
+
+    CalendarEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        date:
+          type: string
+          format: date
+        role:
+          type: string
+        readerId:
+          type: integer
+        readerName:
+          type: string
+        logisticComment:
+          type: string
+        isVacant:
+          type: boolean
+        versionTimestamp:
+          type: string
+          format: date-time
+        liturgicalSeason:
+          type: string
+      required:
+        - id
+        - date
+        - role
+        - isVacant
+
+    GenerateCalendarInput:
+      type: object
+      properties:
+        startDate:
+          type: string
+          format: date
+        period:
+          type: string
+          enum: ["15days", "1month"]
+        roles:
+          type: array
+          items:
+            type: string
+      required:
+        - startDate
+        - period
+
+    UpdateCalendarEntryInput:
+      type: object
+      properties:
+        readerId:
+          type: integer
+        role:
+          type: string
+        logisticComment:
+          type: string
+        isVacant:
+          type: boolean
