@@ -52,7 +52,7 @@ const Dialog = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
         <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 p-4">
           <Card className="w-full shadow-2xl p-6">
-            <h2 className="text-2xl font-display mb-6">{title}</h2>
+            <h2 className="text-2xl font-serif mb-6">{title}</h2>
             {children}
           </Card>
         </motion.div>
@@ -105,7 +105,7 @@ function ReadersTab() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-display">Directorio de Lectores</h2>
+        <h2 className="text-2xl font-serif">Directorio de Lectores</h2>
         <Button onClick={openCreate} className="gap-2"><Plus className="w-5 h-5" /> Nuevo Lector</Button>
       </div>
 
@@ -214,22 +214,22 @@ function CalendarTab() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-2xl font-display">Calendario Asignado</h2>
+        <h2 className="text-2xl font-serif">Calendario Asignado</h2>
         <Button onClick={generateWhatsAppMessage} variant="outline" className="gap-2 bg-green-50 text-green-700 border-green-200 hover:bg-green-100">
           <MessageCircle className="w-5 h-5" /> Enviar por WhatsApp
         </Button>
       </div>
 
-      <Card className="overflow-x-auto">
+      <Card className="overflow-x-auto border border-primary/20 shadow-sm">
         <table className="w-full text-sm text-left">
-          <thead className="bg-muted/50 text-muted-foreground font-medium border-b border-border">
+          <thead className="border-b-2 border-primary/25">
             <tr>
-              <th className="px-4 py-4">Fecha</th>
-              <th className="px-4 py-4">Temporada</th>
-              <th className="px-4 py-4">Rol</th>
-              <th className="px-4 py-4">Lector Asignado</th>
-              <th className="px-4 py-4">Comentario</th>
-              <th className="px-4 py-4">Acciones</th>
+              <th className="px-4 py-3 font-semibold text-primary text-sm bg-secondary/70 whitespace-nowrap" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>Fecha</th>
+              <th className="px-4 py-3 font-semibold text-primary text-sm bg-secondary/70 whitespace-nowrap" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>Temporada</th>
+              <th className="px-4 py-3 font-semibold text-primary text-sm bg-secondary/70 whitespace-nowrap" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>Rol</th>
+              <th className="px-4 py-3 font-semibold text-primary text-sm bg-secondary/70 whitespace-nowrap" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>Lector Asignado</th>
+              <th className="px-4 py-3 font-semibold text-primary text-sm bg-secondary/70 whitespace-nowrap" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>Comentario</th>
+              <th className="px-4 py-3 font-semibold text-primary text-sm bg-secondary/70 whitespace-nowrap" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -237,9 +237,16 @@ function CalendarTab() {
               const season = getLiturgicalSeason(entry.date);
               const isEditing = editingEntryId === entry.id;
               const conflict = entry.readerId ? checkProximityConflict(calendar, entry.readerId, entry.date) : false;
+              const seasonBg: Record<string, string> = {
+                "Verde": "rgba(134, 180, 134, 0.08)",
+                "Morado": "rgba(140, 100, 180, 0.08)",
+                "Dorado": "rgba(201, 146, 42, 0.10)",
+                "Blanco": "rgba(220, 230, 250, 0.10)",
+              };
+              const rowBg = seasonBg[entry.liturgicalSeason ?? season.name] ?? "transparent";
 
               return (
-                <tr key={entry.id} className="hover:bg-muted/30 transition-colors">
+                <tr key={entry.id} className="hover:brightness-95 transition-colors" style={{ background: rowBg }}>
                   <td className="px-4 py-4 font-medium whitespace-nowrap">{formatDate(entry.date)}</td>
                   <td className="px-4 py-4">
                     <Badge className={season.colorClass}>{season.name}</Badge>
@@ -259,9 +266,9 @@ function CalendarTab() {
                     ) : (
                       <div className="flex items-center gap-2">
                         {entry.isVacant ? (
-                          <Badge variant="destructive">VACANTE</Badge>
+                          <Badge variant="destructive" className="text-xs font-bold px-3 py-1 uppercase tracking-widest">🚨 VACANTE</Badge>
                         ) : (
-                          <span className="font-medium">{entry.readerName}</span>
+                          <span className="font-medium" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{entry.readerName}</span>
                         )}
                         {!entry.isVacant && conflict && (
                           <span title="Advertencia: Asignado en otra misa el mismo fin de semana" className="text-amber-500">
@@ -340,7 +347,7 @@ function GenerateTab() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
-        <h2 className="text-2xl font-display text-primary flex items-center gap-2">
+        <h2 className="text-2xl font-serif text-primary flex items-center gap-2">
           <Sparkles className="w-6 h-6 text-accent" />
           Asignación Inteligente
         </h2>
