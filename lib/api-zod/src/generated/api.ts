@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * LiturgiaFlow Pro API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import * as zod from "zod";
 
@@ -119,6 +119,61 @@ export const DeleteUnavailabilityParams = zod.object({
 });
 
 /**
+ * @summary Get all mass schedule configurations
+ */
+export const GetSchedulesResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  dayType: zod.enum([
+    "weekday",
+    "thursday",
+    "saturday_am",
+    "saturday_pm",
+    "sunday_am",
+    "sunday_pm",
+  ]),
+  time: zod.string(),
+  isActive: zod.boolean(),
+  roles: zod.array(zod.string()),
+  sortOrder: zod.number(),
+});
+export const GetSchedulesResponse = zod.array(GetSchedulesResponseItem);
+
+/**
+ * @summary Update a mass schedule time or active state
+ */
+export const UpdateScheduleParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const updateScheduleBodyTimeRegExp = new RegExp(
+  "^([01]\\d|2[0-3]):[0-5]\\d$",
+);
+
+export const UpdateScheduleBody = zod.object({
+  time: zod.string().regex(updateScheduleBodyTimeRegExp).optional(),
+  isActive: zod.boolean().optional(),
+  name: zod.string().optional(),
+});
+
+export const UpdateScheduleResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  dayType: zod.enum([
+    "weekday",
+    "thursday",
+    "saturday_am",
+    "saturday_pm",
+    "sunday_am",
+    "sunday_pm",
+  ]),
+  time: zod.string(),
+  isActive: zod.boolean(),
+  roles: zod.array(zod.string()),
+  sortOrder: zod.number(),
+});
+
+/**
  * @summary Get calendar assignments
  */
 export const GetCalendarQueryParams = zod.object({
@@ -130,6 +185,9 @@ export const GetCalendarResponseItem = zod.object({
   id: zod.number(),
   date: zod.coerce.date(),
   role: zod.string(),
+  scheduleId: zod.number().optional(),
+  scheduleName: zod.string().optional(),
+  scheduleTime: zod.string().optional(),
   readerId: zod.number().optional(),
   readerName: zod.string().optional(),
   logisticComment: zod.string().optional(),
@@ -145,13 +203,15 @@ export const GetCalendarResponse = zod.array(GetCalendarResponseItem);
 export const GenerateCalendarBody = zod.object({
   startDate: zod.coerce.date(),
   period: zod.enum(["15days", "1month"]),
-  roles: zod.array(zod.string()).optional(),
 });
 
 export const GenerateCalendarResponseItem = zod.object({
   id: zod.number(),
   date: zod.coerce.date(),
   role: zod.string(),
+  scheduleId: zod.number().optional(),
+  scheduleName: zod.string().optional(),
+  scheduleTime: zod.string().optional(),
   readerId: zod.number().optional(),
   readerName: zod.string().optional(),
   logisticComment: zod.string().optional(),
@@ -162,16 +222,41 @@ export const GenerateCalendarResponseItem = zod.object({
 export const GenerateCalendarResponse = zod.array(GenerateCalendarResponseItem);
 
 /**
- * @summary Update a calendar entry
+ * @summary Swap reader assignments between two calendar entries
+ */
+export const SwapCalendarEntriesBody = zod.object({
+  entryIdA: zod.number(),
+  entryIdB: zod.number(),
+});
+
+export const SwapCalendarEntriesResponseItem = zod.object({
+  id: zod.number(),
+  date: zod.coerce.date(),
+  role: zod.string(),
+  scheduleId: zod.number().optional(),
+  scheduleName: zod.string().optional(),
+  scheduleTime: zod.string().optional(),
+  readerId: zod.number().optional(),
+  readerName: zod.string().optional(),
+  logisticComment: zod.string().optional(),
+  isVacant: zod.boolean(),
+  versionTimestamp: zod.coerce.date().optional(),
+  liturgicalSeason: zod.string().optional(),
+});
+export const SwapCalendarEntriesResponse = zod.array(
+  SwapCalendarEntriesResponseItem,
+);
+
+/**
+ * @summary Update a calendar entry (reassign reader)
  */
 export const UpdateCalendarEntryParams = zod.object({
   id: zod.coerce.number(),
 });
 
 export const UpdateCalendarEntryBody = zod.object({
-  readerId: zod.number().optional(),
-  role: zod.string().optional(),
-  logisticComment: zod.string().optional(),
+  readerId: zod.number().nullish(),
+  logisticComment: zod.string().nullish(),
   isVacant: zod.boolean().optional(),
 });
 
@@ -179,6 +264,9 @@ export const UpdateCalendarEntryResponse = zod.object({
   id: zod.number(),
   date: zod.coerce.date(),
   role: zod.string(),
+  scheduleId: zod.number().optional(),
+  scheduleName: zod.string().optional(),
+  scheduleTime: zod.string().optional(),
   readerId: zod.number().optional(),
   readerName: zod.string().optional(),
   logisticComment: zod.string().optional(),

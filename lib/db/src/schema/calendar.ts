@@ -2,11 +2,13 @@ import { pgTable, serial, integer, date, text, boolean, timestamp } from "drizzl
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { readersTable } from "./readers";
+import { massSchedulesTable } from "./schedules";
 
 export const calendarTable = pgTable("calendar", {
   id: serial("id").primaryKey(),
   date: date("date").notNull(),
   role: text("role").notNull(),
+  scheduleId: integer("schedule_id").references(() => massSchedulesTable.id, { onDelete: "set null" }),
   readerId: integer("reader_id").references(() => readersTable.id, { onDelete: "set null" }),
   logisticComment: text("logistic_comment"),
   isVacant: boolean("is_vacant").notNull().default(false),

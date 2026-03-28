@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * LiturgiaFlow Pro API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
@@ -25,10 +25,13 @@ import type {
   GetCalendarParams,
   GetUnavailabilityParams,
   HealthStatus,
+  MassSchedule,
   Reader,
+  SwapEntriesInput,
   Unavailability,
   UpdateCalendarEntryInput,
   UpdateReaderInput,
+  UpdateScheduleInput,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -714,6 +717,168 @@ export const useDeleteUnavailability = <
 };
 
 /**
+ * @summary Get all mass schedule configurations
+ */
+export const getGetSchedulesUrl = () => {
+  return `/api/schedules`;
+};
+
+export const getSchedules = async (
+  options?: RequestInit,
+): Promise<MassSchedule[]> => {
+  return customFetch<MassSchedule[]>(getGetSchedulesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetSchedulesQueryKey = () => {
+  return [`/api/schedules`] as const;
+};
+
+export const getGetSchedulesQueryOptions = <
+  TData = Awaited<ReturnType<typeof getSchedules>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getSchedules>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetSchedulesQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getSchedules>>> = ({
+    signal,
+  }) => getSchedules({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getSchedules>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetSchedulesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getSchedules>>
+>;
+export type GetSchedulesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get all mass schedule configurations
+ */
+
+export function useGetSchedules<
+  TData = Awaited<ReturnType<typeof getSchedules>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getSchedules>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetSchedulesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update a mass schedule time or active state
+ */
+export const getUpdateScheduleUrl = (id: number) => {
+  return `/api/schedules/${id}`;
+};
+
+export const updateSchedule = async (
+  id: number,
+  updateScheduleInput: UpdateScheduleInput,
+  options?: RequestInit,
+): Promise<MassSchedule> => {
+  return customFetch<MassSchedule>(getUpdateScheduleUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateScheduleInput),
+  });
+};
+
+export const getUpdateScheduleMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateSchedule>>,
+    TError,
+    { id: number; data: BodyType<UpdateScheduleInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateSchedule>>,
+  TError,
+  { id: number; data: BodyType<UpdateScheduleInput> },
+  TContext
+> => {
+  const mutationKey = ["updateSchedule"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateSchedule>>,
+    { id: number; data: BodyType<UpdateScheduleInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateSchedule(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateScheduleMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateSchedule>>
+>;
+export type UpdateScheduleMutationBody = BodyType<UpdateScheduleInput>;
+export type UpdateScheduleMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Update a mass schedule time or active state
+ */
+export const useUpdateSchedule = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateSchedule>>,
+    TError,
+    { id: number; data: BodyType<UpdateScheduleInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateSchedule>>,
+  TError,
+  { id: number; data: BodyType<UpdateScheduleInput> },
+  TContext
+> => {
+  return useMutation(getUpdateScheduleMutationOptions(options));
+};
+
+/**
  * @summary Get calendar assignments
  */
 export const getGetCalendarUrl = (params?: GetCalendarParams) => {
@@ -894,7 +1059,93 @@ export const useGenerateCalendar = <
 };
 
 /**
- * @summary Update a calendar entry
+ * @summary Swap reader assignments between two calendar entries
+ */
+export const getSwapCalendarEntriesUrl = () => {
+  return `/api/calendar/swap`;
+};
+
+export const swapCalendarEntries = async (
+  swapEntriesInput: SwapEntriesInput,
+  options?: RequestInit,
+): Promise<CalendarEntry[]> => {
+  return customFetch<CalendarEntry[]>(getSwapCalendarEntriesUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(swapEntriesInput),
+  });
+};
+
+export const getSwapCalendarEntriesMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof swapCalendarEntries>>,
+    TError,
+    { data: BodyType<SwapEntriesInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof swapCalendarEntries>>,
+  TError,
+  { data: BodyType<SwapEntriesInput> },
+  TContext
+> => {
+  const mutationKey = ["swapCalendarEntries"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof swapCalendarEntries>>,
+    { data: BodyType<SwapEntriesInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return swapCalendarEntries(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SwapCalendarEntriesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof swapCalendarEntries>>
+>;
+export type SwapCalendarEntriesMutationBody = BodyType<SwapEntriesInput>;
+export type SwapCalendarEntriesMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Swap reader assignments between two calendar entries
+ */
+export const useSwapCalendarEntries = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof swapCalendarEntries>>,
+    TError,
+    { data: BodyType<SwapEntriesInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof swapCalendarEntries>>,
+  TError,
+  { data: BodyType<SwapEntriesInput> },
+  TContext
+> => {
+  return useMutation(getSwapCalendarEntriesMutationOptions(options));
+};
+
+/**
+ * @summary Update a calendar entry (reassign reader)
  */
 export const getUpdateCalendarEntryUrl = (id: number) => {
   return `/api/calendar/${id}`;
@@ -959,7 +1210,7 @@ export type UpdateCalendarEntryMutationBody =
 export type UpdateCalendarEntryMutationError = ErrorType<ErrorResponse>;
 
 /**
- * @summary Update a calendar entry
+ * @summary Update a calendar entry (reassign reader)
  */
 export const useUpdateCalendarEntry = <
   TError = ErrorType<ErrorResponse>,

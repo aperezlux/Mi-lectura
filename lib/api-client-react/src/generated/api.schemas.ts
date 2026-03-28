@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * LiturgiaFlow Pro API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 export interface HealthStatus {
   status: string;
@@ -85,10 +85,42 @@ export interface CreateUnavailabilityInput {
   blockedDate: string;
 }
 
+export type MassScheduleDayType =
+  (typeof MassScheduleDayType)[keyof typeof MassScheduleDayType];
+
+export const MassScheduleDayType = {
+  weekday: "weekday",
+  thursday: "thursday",
+  saturday_am: "saturday_am",
+  saturday_pm: "saturday_pm",
+  sunday_am: "sunday_am",
+  sunday_pm: "sunday_pm",
+} as const;
+
+export interface MassSchedule {
+  id: number;
+  name: string;
+  dayType: MassScheduleDayType;
+  time: string;
+  isActive: boolean;
+  roles: string[];
+  sortOrder: number;
+}
+
+export interface UpdateScheduleInput {
+  /** @pattern ^([01]\d|2[0-3]):[0-5]\d$ */
+  time?: string;
+  isActive?: boolean;
+  name?: string;
+}
+
 export interface CalendarEntry {
   id: number;
   date: string;
   role: string;
+  scheduleId?: number;
+  scheduleName?: string;
+  scheduleTime?: string;
   readerId?: number;
   readerName?: string;
   logisticComment?: string;
@@ -108,14 +140,17 @@ export const GenerateCalendarInputPeriod = {
 export interface GenerateCalendarInput {
   startDate: string;
   period: GenerateCalendarInputPeriod;
-  roles?: string[];
 }
 
 export interface UpdateCalendarEntryInput {
-  readerId?: number;
-  role?: string;
-  logisticComment?: string;
+  readerId?: number | null;
+  logisticComment?: string | null;
   isVacant?: boolean;
+}
+
+export interface SwapEntriesInput {
+  entryIdA: number;
+  entryIdB: number;
 }
 
 export type GetUnavailabilityParams = {

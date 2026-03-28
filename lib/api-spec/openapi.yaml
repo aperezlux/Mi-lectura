@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Api
-  version: 0.1.0
+  version: 0.2.0
   description: LiturgiaFlow Pro API
 servers:
   - url: /api
@@ -15,6 +15,8 @@ tags:
     description: Reader unavailability management
   - name: calendar
     description: Liturgical calendar and assignments
+  - name: schedules
+    description: Mass schedule configuration
 paths:
   /healthz:
     get:
@@ -169,6 +171,52 @@ paths:
         "204":
           description: Deleted
 
+  /schedules:
+    get:
+      operationId: getSchedules
+      tags: [schedules]
+      summary: Get all mass schedule configurations
+      responses:
+        "200":
+          description: List of mass schedules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MassSchedule"
+
+  /schedules/{id}:
+    put:
+      operationId: updateSchedule
+      tags: [schedules]
+      summary: Update a mass schedule time or active state
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateScheduleInput"
+      responses:
+        "200":
+          description: Updated schedule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MassSchedule"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /calendar:
     get:
       operationId: getCalendar
@@ -222,11 +270,38 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /calendar/swap:
+    post:
+      operationId: swapCalendarEntries
+      tags: [calendar]
+      summary: Swap reader assignments between two calendar entries
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SwapEntriesInput"
+      responses:
+        "200":
+          description: Swapped entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CalendarEntry"
+        "400":
+          description: Conflict or validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /calendar/{id}:
     put:
       operationId: updateCalendarEntry
       tags: [calendar]
-      summary: Update a calendar entry
+      summary: Update a calendar entry (reassign reader)
       parameters:
         - name: id
           in: path
@@ -246,6 +321,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CalendarEntry"
+        "400":
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Not found
           content:
@@ -371,6 +452,46 @@ components:
         - readerId
         - blockedDate
 
+    MassSchedule:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        dayType:
+          type: string
+          enum: [weekday, thursday, saturday_am, saturday_pm, sunday_am, sunday_pm]
+        time:
+          type: string
+        isActive:
+          type: boolean
+        roles:
+          type: array
+          items:
+            type: string
+        sortOrder:
+          type: integer
+      required:
+        - id
+        - name
+        - dayType
+        - time
+        - isActive
+        - roles
+        - sortOrder
+
+    UpdateScheduleInput:
+      type: object
+      properties:
+        time:
+          type: string
+          pattern: "^([01]\\d|2[0-3]):[0-5]\\d$"
+        isActive:
+          type: boolean
+        name:
+          type: string
+
     CalendarEntry:
       type: object
       properties:
@@ -380,6 +501,12 @@ components:
           type: string
           format: date
         role:
+          type: string
+        scheduleId:
+          type: integer
+        scheduleName:
+          type: string
+        scheduleTime:
           type: string
         readerId:
           type: integer
@@ -409,10 +536,6 @@ components:
         period:
           type: string
           enum: ["15days", "1month"]
-        roles:
-          type: array
-          items:
-            type: string
       required:
         - startDate
         - period
@@ -422,9 +545,20 @@ components:
       properties:
         readerId:
           type: integer
-        role:
-          type: string
+          nullable: true
         logisticComment:
           type: string
+          nullable: true
         isVacant:
           type: boolean
+
+    SwapEntriesInput:
+      type: object
+      properties:
+        entryIdA:
+          type: integer
+        entryIdB:
+          type: integer
+      required:
+        - entryIdA
+        - entryIdB

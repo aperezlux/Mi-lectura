@@ -3,13 +3,16 @@
  * Do not edit manually.
  * Api
  * LiturgiaFlow Pro API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 
 export interface CalendarEntry {
   id: number;
   date: Date;
   role: string;
+  scheduleId?: number;
+  scheduleName?: string;
+  scheduleTime?: string;
   readerId?: number;
   readerName?: string;
   logisticComment?: string;

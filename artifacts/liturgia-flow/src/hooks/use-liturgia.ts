@@ -7,13 +7,14 @@ import {
   useGetCalendar,
   useGenerateCalendar,
   useUpdateCalendarEntry,
+  useSwapCalendarEntries,
   useGetUnavailability,
   useCreateUnavailability,
-  useDeleteUnavailability
+  useDeleteUnavailability,
+  useGetSchedules,
+  useUpdateSchedule,
 } from "@workspace/api-client-react";
 import { useToast } from "./use-toast";
-
-// Wrappers around generated hooks to add cache invalidation and toast notifications
 
 export function useReaders() {
   return useGetReaders();
@@ -71,7 +72,10 @@ export function useCalendarMutations() {
         queryClient.invalidateQueries({ queryKey: ["/api/calendar"] });
         toast({ title: "Calendario generado", description: "Las asignaciones han sido creadas." });
       },
-      onError: () => toast({ title: "Error", description: "No se pudo generar el calendario.", variant: "destructive" })
+      onError: (err: any) => {
+        const msg = err?.response?.data?.error ?? "No se pudo generar el calendario.";
+        toast({ title: "Error", description: msg, variant: "destructive" });
+      }
     }
   });
 
@@ -81,11 +85,27 @@ export function useCalendarMutations() {
         queryClient.invalidateQueries({ queryKey: ["/api/calendar"] });
         toast({ title: "Asignación actualizada", description: "El cambio ha sido guardado." });
       },
-      onError: () => toast({ title: "Error", description: "No se pudo actualizar la asignación.", variant: "destructive" })
+      onError: (err: any) => {
+        const msg = err?.response?.data?.error ?? "No se pudo actualizar la asignación.";
+        toast({ title: "Conflicto detectado", description: msg, variant: "destructive" });
+      }
     }
   });
 
-  return { generate, updateEntry };
+  const swap = useSwapCalendarEntries({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/calendar"] });
+        toast({ title: "Intercambio realizado", description: "Las asignaciones han sido intercambiadas." });
+      },
+      onError: (err: any) => {
+        const msg = err?.response?.data?.error ?? "No se pudo realizar el intercambio.";
+        toast({ title: "Conflicto detectado", description: msg, variant: "destructive" });
+      }
+    }
+  });
+
+  return { generate, updateEntry, swap };
 }
 
 export function useUnavailability(readerId?: number) {
@@ -115,4 +135,25 @@ export function useUnavailabilityMutations() {
   });
 
   return { block, unblock };
+}
+
+export function useSchedules() {
+  return useGetSchedules();
+}
+
+export function useScheduleMutations() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const update = useUpdateSchedule({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
+        toast({ title: "Horario actualizado", description: "El cambio se reflejará en el próximo calendario generado." });
+      },
+      onError: () => toast({ title: "Error", description: "No se pudo actualizar el horario.", variant: "destructive" })
+    }
+  });
+
+  return { update };
 }

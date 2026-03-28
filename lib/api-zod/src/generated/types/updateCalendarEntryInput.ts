@@ -3,12 +3,11 @@
  * Do not edit manually.
  * Api
  * LiturgiaFlow Pro API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 
 export interface UpdateCalendarEntryInput {
-  readerId?: number;
-  role?: string;
-  logisticComment?: string;
+  readerId?: number | null;
+  logisticComment?: string | null;
   isVacant?: boolean;
 }
