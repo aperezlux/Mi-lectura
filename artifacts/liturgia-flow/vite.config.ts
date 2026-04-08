@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { VitePWA } from "vite-plugin-pwa";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
@@ -32,6 +33,44 @@ export default defineConfig({
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),
+    VitePWA({
+      registerType: "autoUpdate",
+      injectRegister: "auto",
+      base: basePath,
+      manifest: {
+        name: "LiturgiaFlow Pro",
+        short_name: "LiturgiaFlow",
+        description: "Gestión de lectores — Parroquia Santo Cristo de Esquipulas",
+        start_url: basePath,
+        scope: basePath,
+        display: "standalone",
+        orientation: "portrait-primary",
+        background_color: "#FDF2F8",
+        theme_color: "#6B1E3C",
+        lang: "es",
+        icons: [
+          { src: `${basePath}icon-192.svg`, sizes: "192x192", type: "image/svg+xml", purpose: "any" },
+          { src: `${basePath}icon-512.svg`, sizes: "512x512", type: "image/svg+xml", purpose: "maskable" },
+        ],
+      },
+      workbox: {
+        globPatterns: ["**/*.{js,css,html,svg,png,jpg,webp,woff2}"],
+        runtimeCaching: [
+          {
+            urlPattern: /\/api\/(readers|calendar|schedules|unavailability)/,
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "liturgia-api-cache",
+              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 },
+              networkTimeoutSeconds: 5,
+            },
+          },
+        ],
+      },
+      devOptions: {
+        enabled: false,
+      },
+    }),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [

@@ -2,7 +2,8 @@ import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, Edit2, Trash2, MessageCircle, AlertCircle, Sparkles,
-  Calendar as CalIcon, Table as TableIcon, Clock, ToggleLeft, ArrowLeftRight, ChevronLeft, ChevronRight, Settings
+  Calendar as CalIcon, Table as TableIcon, Clock, ArrowLeftRight,
+  ChevronLeft, ChevronRight, Settings, Grid3X3
 } from "lucide-react";
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval,
@@ -16,29 +17,28 @@ import {
 import { formatDate, getLiturgicalSeason, checkProximityConflict, cn } from "@/lib/utils";
 import type { Reader, CalendarEntry, CreateReaderInput, UpdateReaderInputLevel, MassSchedule } from "@workspace/api-client-react";
 
-// ─── Primitive UI Components ───────────────────────────────────────────────
+// ─── Primitive UI Components ────────────────────────────────────────────────
 
 const Card = ({ children, className }: { children: React.ReactNode; className?: string }) => (
   <div className={cn("bg-white rounded-2xl border border-border shadow-sm overflow-hidden", className)}>{children}</div>
 );
 
 const Button = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "secondary" | "outline" | "ghost" | "destructive" | "success";
+  variant?: "primary" | "secondary" | "outline" | "ghost" | "destructive";
   size?: "sm" | "md" | "lg" | "icon";
 }>(({ className, variant = "primary", size = "md", ...props }, ref) => {
-  const variants: Record<string, string> = {
+  const v: Record<string, string> = {
     primary: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md shadow-primary/20",
     secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
     outline: "border-2 border-primary text-primary hover:bg-primary/5",
     ghost: "hover:bg-muted text-muted-foreground hover:text-foreground",
     destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-    success: "bg-green-600 text-white hover:bg-green-700",
   };
-  const sizes: Record<string, string> = {
+  const s: Record<string, string> = {
     sm: "h-9 px-3 text-xs", md: "h-11 px-6 font-medium", lg: "h-14 px-8 text-lg font-medium", icon: "h-11 w-11",
   };
   return (
-    <button ref={ref} className={cn("inline-flex items-center justify-center rounded-xl transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none", variants[variant], sizes[size], className)} {...props} />
+    <button ref={ref} className={cn("inline-flex items-center justify-center rounded-xl transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none", v[variant], s[size], className)} {...props} />
   );
 });
 
@@ -48,15 +48,14 @@ const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLI
   )
 );
 
-const Badge = ({ children, className, variant = "default" }: { children: React.ReactNode; className?: string; variant?: "default" | "outline" | "destructive" | "warning" | "season" }) => {
-  const variants: Record<string, string> = {
+const Badge = ({ children, className, variant = "default" }: { children: React.ReactNode; className?: string; variant?: "default" | "outline" | "destructive" | "warning" }) => {
+  const v: Record<string, string> = {
     default: "bg-primary/10 text-primary",
     outline: "border border-border text-foreground",
     destructive: "bg-destructive/10 text-destructive border border-destructive/20",
     warning: "bg-amber-100 text-amber-800 border border-amber-200",
-    season: "",
   };
-  return <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold", variants[variant], className)}>{children}</span>;
+  return <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold", v[variant], className)}>{children}</span>;
 };
 
 const SelectEl = ({ value, onChange, options, placeholder, className }: {
@@ -84,7 +83,7 @@ const Dialog = ({ isOpen, onClose, title, children, wide }: { isOpen: boolean; o
   </AnimatePresence>
 );
 
-// ─── Helpers ──────────────────────────────────────────────────────────────
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
 function parseRolePart(roleStr: string): string {
   return roleStr.split(" - ")[0];
@@ -103,156 +102,211 @@ const SEASON_COLORS: Record<string, { bg: string; badge: string; border: string 
   "Rojo":   { bg: "rgba(200,80,80,0.10)", badge: "bg-red-100 text-red-800", border: "border-red-300" },
 };
 
-// ─── Reassign / Swap Modal ─────────────────────────────────────────────────
-
-interface EditModalProps {
-  entry: CalendarEntry | null;
-  sameDay: CalendarEntry[];
-  readers: Reader[];
-  allUnavailability: any[];
-  onClose: () => void;
-  onReassign: (entryId: number, readerId: number | null) => void;
-  onSwap: (entryIdA: number, entryIdB: number) => void;
-  isLoading: boolean;
+function getGeneratedAt(entries: CalendarEntry[]): string | null {
+  if (entries.length === 0) return null;
+  const timestamps = entries
+    .map(e => e.versionTimestamp)
+    .filter(Boolean)
+    .sort()
+    .reverse();
+  if (!timestamps[0]) return null;
+  const d = new Date(timestamps[0]);
+  return `${d.toLocaleDateString("es-GT", { day: "2-digit", month: "2-digit", year: "numeric" })} ${d.toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" })}`;
 }
 
-function EditModal({ entry, sameDay, readers, allUnavailability, onClose, onReassign, onSwap, isLoading }: EditModalProps) {
-  const [tab, setTab] = useState<"reassign" | "swap">("reassign");
-  const [selectedReaderId, setSelectedReaderId] = useState<string>(entry?.readerId?.toString() ?? "0");
-  const [swapTargetId, setSwapTargetId] = useState<string>("");
+// ─── Week Grid View (5-column reference layout) ─────────────────────────────
 
-  if (!entry) return null;
+const GRID_COLUMNS = [
+  { key: "thursday",    label: "Jueves",    abbr: "Jue" },
+  { key: "saturday_am", label: "Sáb A.M.",  abbr: "SáAM" },
+  { key: "saturday_pm", label: "Sáb P.M.",  abbr: "SáPM" },
+  { key: "sunday_am",   label: "Dom A.M.",  abbr: "DoAM" },
+  { key: "sunday_pm",   label: "Dom P.M.",  abbr: "DoPM" },
+] as const;
 
-  const blockedOnThisDate = new Set(
-    allUnavailability.filter(u => u.blockedDate === entry.date).map((u: any) => u.readerId)
-  );
+// Unified role rows (superset of all schedules)
+const GRID_ROLES = [
+  "Bienvenida 1",
+  "Bienvenida 2",
+  "Monitor",
+  "1ª Lectura",
+  "Salmo",
+  "2ª Lectura",
+  "Oraciones",
+];
 
-  const availableReaders = readers.filter(r => !blockedOnThisDate.has(r.id));
+// Which roles apply to each day type
+const ROLES_FOR_COL: Record<string, Set<string>> = {
+  thursday:    new Set(["1ª Lectura", "Salmo", "Oraciones"]),
+  saturday_am: new Set(["Monitor", "1ª Lectura", "Salmo", "2ª Lectura", "Oraciones"]),
+  saturday_pm: new Set(["Monitor", "1ª Lectura", "Salmo", "2ª Lectura", "Oraciones"]),
+  sunday_am:   new Set(["Bienvenida 1", "Bienvenida 2", "Monitor", "1ª Lectura", "Salmo", "2ª Lectura", "Oraciones"]),
+  sunday_pm:   new Set(["Monitor", "1ª Lectura", "Salmo", "2ª Lectura", "Oraciones"]),
+};
 
-  const otherEntries = sameDay.filter(e => e.id !== entry.id);
+function getWeekMonday(dateStr: string): string {
+  const d = new Date(dateStr + "T12:00:00");
+  const dow = d.getDay();
+  const diff = dow === 0 ? -6 : 1 - dow;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().split("T")[0];
+}
+
+interface WeekGridViewProps {
+  entries: CalendarEntry[];
+  schedules: MassSchedule[];
+  onEditEntry: (entry: CalendarEntry) => void;
+}
+
+function WeekGridView({ entries, schedules, onEditEntry }: WeekGridViewProps) {
+  // Build scheduleId → dayType lookup
+  const scheduleTypeMap = useMemo(() => {
+    const m = new Map<number, string>();
+    for (const s of schedules) m.set(s.id, s.dayType);
+    return m;
+  }, [schedules]);
+
+  // Group entries by week (Mon key) → dayType → role → entry
+  const weeks = useMemo(() => {
+    const weekMap = new Map<string, Map<string, CalendarEntry[]>>();
+
+    for (const e of entries) {
+      if (!e.scheduleId) continue;
+      const dayType = scheduleTypeMap.get(e.scheduleId);
+      if (!dayType) continue;
+      // Only show in grid for the 5 key schedule types
+      if (!GRID_COLUMNS.some(c => c.key === dayType)) continue;
+
+      const weekKey = getWeekMonday(e.date);
+      if (!weekMap.has(weekKey)) weekMap.set(weekKey, new Map());
+      const weekData = weekMap.get(weekKey)!;
+      if (!weekData.has(dayType)) weekData.set(dayType, []);
+      weekData.get(dayType)!.push(e);
+    }
+
+    // Sort weeks
+    return Array.from(weekMap.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [entries, scheduleTypeMap]);
+
+  if (weeks.length === 0) {
+    return (
+      <div className="py-12 text-center text-muted-foreground border-2 border-dashed border-border rounded-2xl">
+        No hay asignaciones para mostrar en la cuadrícula.<br/>
+        <span className="text-sm">Genera el calendario primero desde la pestaña "Generar".</span>
+      </div>
+    );
+  }
 
   return (
-    <Dialog isOpen onClose={onClose} title="Editar Asignación" wide>
-      <div className="space-y-5">
-        <div className="bg-secondary/50 rounded-xl p-4 space-y-1">
-          <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Entrada seleccionada</p>
-          <p className="font-medium">{formatDate(entry.date)} · {parseSchedulePart(entry.role)}</p>
-          <p className="text-sm font-serif">{parseRolePart(entry.role)}</p>
-          <p className="text-sm">
-            Asignado:{" "}
-            <span className={cn("font-semibold", entry.isVacant ? "text-destructive" : "text-primary")}>
-              {entry.isVacant ? "VACANTE" : entry.readerName}
-            </span>
-          </p>
-        </div>
+    <div className="space-y-8">
+      {weeks.map(([weekKey, weekData]) => {
+        const weekEnd = new Date(weekKey + "T12:00:00");
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        const weekLabel = `${format(new Date(weekKey + "T12:00:00"), "d MMM", { locale: es })} – ${format(weekEnd, "d MMM yyyy", { locale: es })}`;
 
-        {/* Tabs */}
-        <div className="flex rounded-xl overflow-hidden border border-border">
-          <button
-            className={cn("flex-1 py-2.5 text-sm font-medium transition-colors", tab === "reassign" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
-            onClick={() => setTab("reassign")}
-          >
-            <Edit2 className="w-4 h-4 inline mr-1" /> Reasignar
-          </button>
-          <button
-            className={cn("flex-1 py-2.5 text-sm font-medium transition-colors", tab === "swap" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
-            onClick={() => setTab("swap")}
-            disabled={otherEntries.length === 0}
-          >
-            <ArrowLeftRight className="w-4 h-4 inline mr-1" /> Intercambiar
-          </button>
-        </div>
+        // Get schedule info per column
+        const colInfo = GRID_COLUMNS.map(col => {
+          const colEntries = weekData.get(col.key) ?? [];
+          const date = colEntries[0]?.date;
+          const schedule = schedules.find(s => s.dayType === col.key && s.isActive);
+          return { ...col, entries: colEntries, date, schedule };
+        });
 
-        {tab === "reassign" && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Seleccionar Lector</label>
-              <SelectEl
-                value={selectedReaderId}
-                onChange={setSelectedReaderId}
-                options={[
-                  { label: "-- VACANTE --", value: "0" },
-                  ...availableReaders.map(r => ({ label: r.name + (r.level === "Experto" ? " ★" : ""), value: r.id.toString() }))
-                ]}
-              />
-              {blockedOnThisDate.size > 0 && (
-                <p className="text-xs text-amber-700 mt-1 flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3" />
-                  {blockedOnThisDate.size} lector(es) no disponibles para esta fecha (ocultos).
-                </p>
-              )}
+        return (
+          <div key={weekKey}>
+            {/* Week header */}
+            <div className="flex items-center gap-3 mb-3">
+              <div className="h-px flex-1 bg-primary/20" />
+              <span className="text-sm font-semibold text-primary px-2 whitespace-nowrap" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                Semana del {weekLabel}
+              </span>
+              <div className="h-px flex-1 bg-primary/20" />
             </div>
-            <div className="flex gap-3 pt-2">
-              <Button variant="outline" className="flex-1" onClick={onClose}>Cancelar</Button>
-              <Button
-                className="flex-1"
-                disabled={isLoading}
-                onClick={() => {
-                  const rid = selectedReaderId === "0" ? null : Number(selectedReaderId);
-                  onReassign(entry.id, rid);
-                  onClose();
-                }}
-              >
-                {isLoading ? "Guardando..." : "Confirmar Reasignación"}
-              </Button>
+
+            <div className="overflow-x-auto rounded-2xl border border-primary/20 shadow-sm">
+              <table className="w-full min-w-[640px] text-sm">
+                {/* Column headers */}
+                <thead>
+                  <tr className="border-b-2 border-primary/20">
+                    <th className="px-3 py-3 text-left text-xs font-semibold text-primary bg-secondary/60 w-28">
+                      Función
+                    </th>
+                    {colInfo.map(col => (
+                      <th key={col.key} className="px-3 py-2 text-center bg-secondary/60 border-l border-primary/10">
+                        <div className="font-bold text-primary text-xs" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{col.label}</div>
+                        {col.schedule && (
+                          <div className="text-primary/70 text-xs font-mono font-semibold">{col.schedule.time}</div>
+                        )}
+                        {col.date && (
+                          <div className="text-muted-foreground text-xs">{format(new Date(col.date + "T12:00:00"), "d MMM", { locale: es })}</div>
+                        )}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+
+                {/* Role rows */}
+                <tbody className="divide-y divide-border">
+                  {GRID_ROLES.map(role => {
+                    // Check if this role appears in ANY column this week
+                    const hasAnything = colInfo.some(col => ROLES_FOR_COL[col.key]?.has(role));
+                    if (!hasAnything) return null;
+
+                    return (
+                      <tr key={role} className="hover:bg-muted/20 transition-colors">
+                        <td className="px-3 py-2.5 text-xs font-semibold text-muted-foreground bg-secondary/20 border-r border-primary/10 whitespace-nowrap">
+                          {role}
+                        </td>
+                        {colInfo.map(col => {
+                          const applicable = ROLES_FOR_COL[col.key]?.has(role);
+                          if (!applicable) {
+                            return <td key={col.key} className="px-2 py-2.5 text-center border-l border-primary/10 bg-muted/10"><span className="text-muted-foreground/30 text-xs">—</span></td>;
+                          }
+
+                          const entry = col.entries.find(e => parseRolePart(e.role) === role);
+                          if (!entry) {
+                            return (
+                              <td key={col.key} className="px-2 py-2.5 text-center border-l border-primary/10">
+                                <span className="text-muted-foreground/40 text-xs italic">sin fecha</span>
+                              </td>
+                            );
+                          }
+
+                          return (
+                            <td key={col.key} className="px-2 py-2.5 text-center border-l border-primary/10">
+                              {entry.isVacant ? (
+                                <button onClick={() => onEditEntry(entry)} className="group">
+                                  <Badge variant="destructive" className="text-xs cursor-pointer group-hover:bg-destructive/20 transition-colors">
+                                    🚨 VACANTE
+                                  </Badge>
+                                </button>
+                              ) : (
+                                <button onClick={() => onEditEntry(entry)} className="group text-left w-full">
+                                  <span className="block text-xs font-semibold text-foreground group-hover:text-primary transition-colors" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                                    {entry.readerName}
+                                  </span>
+                                  {entry.logisticComment && (
+                                    <span className="text-[10px] text-amber-700 italic block mt-0.5">{entry.logisticComment}</span>
+                                  )}
+                                </button>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
-        )}
-
-        {tab === "swap" && (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Selecciona otra asignación del mismo día con quien intercambiar el lector.
-            </p>
-            <div>
-              <label className="block text-sm font-medium mb-1">Intercambiar con:</label>
-              <SelectEl
-                value={swapTargetId}
-                onChange={setSwapTargetId}
-                placeholder="-- Seleccionar asignación --"
-                options={otherEntries.map(e => ({
-                  label: `${parseRolePart(e.role)} → ${e.isVacant ? "VACANTE" : e.readerName}`,
-                  value: e.id.toString()
-                }))}
-              />
-            </div>
-            {swapTargetId && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm">
-                <p className="font-medium text-amber-900 mb-1">Resultado del intercambio:</p>
-                {(() => {
-                  const target = otherEntries.find(e => e.id.toString() === swapTargetId);
-                  return (
-                    <ul className="text-amber-800 space-y-0.5">
-                      <li>• {parseRolePart(entry.role)} → <strong>{target?.isVacant ? "VACANTE" : target?.readerName}</strong></li>
-                      <li>• {parseRolePart(target?.role ?? "")} → <strong>{entry.isVacant ? "VACANTE" : entry.readerName}</strong></li>
-                    </ul>
-                  );
-                })()}
-              </div>
-            )}
-            <div className="flex gap-3 pt-2">
-              <Button variant="outline" className="flex-1" onClick={onClose}>Cancelar</Button>
-              <Button
-                className="flex-1"
-                disabled={isLoading || !swapTargetId}
-                onClick={() => {
-                  if (swapTargetId) {
-                    onSwap(entry.id, Number(swapTargetId));
-                    onClose();
-                  }
-                }}
-              >
-                {isLoading ? "Intercambiando..." : "Confirmar Intercambio"}
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
-    </Dialog>
+        );
+      })}
+    </div>
   );
 }
 
-// ─── Monthly Calendar ──────────────────────────────────────────────────────
+// ─── Monthly Calendar ────────────────────────────────────────────────────────
 
 interface MonthlyCalendarProps {
   entries: CalendarEntry[];
@@ -267,7 +321,6 @@ function MonthlyCalendar({ entries, onEditEntry }: MonthlyCalendarProps) {
   const monthEnd = endOfMonth(monthDate);
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
-  // Build entry lookup by date
   const entryByDate = useMemo(() => {
     const map = new Map<string, CalendarEntry[]>();
     for (const e of entries) {
@@ -277,16 +330,14 @@ function MonthlyCalendar({ entries, onEditEntry }: MonthlyCalendarProps) {
     return map;
   }, [entries]);
 
-  // Starting empty cells
-  const firstDow = getDay(monthStart); // 0=Sun
-  const emptyCells = firstDow === 0 ? 6 : firstDow - 1; // Mon-first grid
+  const firstDow = getDay(monthStart);
+  const emptyCells = firstDow === 0 ? 6 : firstDow - 1;
 
   const selectedEntries = selectedDate ? (entryByDate.get(selectedDate) ?? []) : [];
   const selectedSeason = selectedDate ? getLiturgicalSeason(selectedDate) : null;
 
   return (
     <div className="space-y-4">
-      {/* Month navigation */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" size="icon" onClick={() => setMonthDate(subMonths(monthDate, 1))}>
           <ChevronLeft className="w-5 h-5" />
@@ -297,26 +348,22 @@ function MonthlyCalendar({ entries, onEditEntry }: MonthlyCalendarProps) {
         </Button>
       </div>
 
-      {/* Legend */}
       <div className="flex flex-wrap gap-2 text-xs">
         {Object.entries(SEASON_COLORS).map(([name, c]) => (
           <span key={name} className={cn("px-2 py-0.5 rounded-full border", c.badge, c.border)}>{name}</span>
         ))}
       </div>
 
-      {/* Grid */}
       <div className="border border-primary/20 rounded-2xl overflow-hidden bg-white">
-        {/* Day headers */}
         <div className="grid grid-cols-7 border-b border-primary/20">
           {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(d => (
             <div key={d} className="py-2 text-center text-xs font-semibold text-primary bg-secondary/60">{d}</div>
           ))}
         </div>
 
-        {/* Day cells */}
         <div className="grid grid-cols-7">
           {Array.from({ length: emptyCells }).map((_, i) => (
-            <div key={`empty-${i}`} className="min-h-[80px] border-b border-r border-border/30 bg-gray-50/50" />
+            <div key={`e-${i}`} className="min-h-[80px] border-b border-r border-border/30 bg-gray-50/50" />
           ))}
 
           {days.map(day => {
@@ -327,7 +374,6 @@ function MonthlyCalendar({ entries, onEditEntry }: MonthlyCalendarProps) {
             const isSelected = selectedDate === dateStr;
             const vacantCount = dayEntries.filter(e => e.isVacant).length;
 
-            // Group entries by schedule
             const bySchedule = new Map<string, CalendarEntry[]>();
             for (const e of dayEntries) {
               const key = parseSchedulePart(e.role);
@@ -339,45 +385,32 @@ function MonthlyCalendar({ entries, onEditEntry }: MonthlyCalendarProps) {
               <button
                 key={dateStr}
                 onClick={() => setSelectedDate(isSelected ? null : dateStr)}
-                className={cn(
-                  "min-h-[80px] border-b border-r border-border/30 p-1.5 text-left transition-all hover:brightness-95",
-                  !isSameMonth(day, monthDate) && "bg-gray-50/50 opacity-50",
-                  isSelected && "ring-2 ring-inset ring-primary",
-                )}
+                className={cn("min-h-[80px] border-b border-r border-border/30 p-1.5 text-left transition-all hover:brightness-95", !isSameMonth(day, monthDate) && "opacity-50", isSelected && "ring-2 ring-inset ring-primary")}
                 style={{ background: colors ? colors.bg : undefined }}
               >
                 <div className="flex justify-between items-start mb-1">
                   <span className={cn("text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full", isSelected ? "bg-primary text-white" : "text-foreground")}>
                     {format(day, "d")}
                   </span>
-                  {vacantCount > 0 && (
-                    <span className="text-[10px] bg-red-100 text-red-700 rounded-full px-1 font-bold">!{vacantCount}</span>
-                  )}
+                  {vacantCount > 0 && <span className="text-[10px] bg-red-100 text-red-700 rounded-full px-1 font-bold">!{vacantCount}</span>}
                 </div>
                 {Array.from(bySchedule.entries()).slice(0, 2).map(([schedName, es]) => (
                   <div key={schedName} className="text-[10px] leading-tight mb-0.5">
                     <span className="text-muted-foreground font-medium">{schedName.split(" ").slice(-2).join(" ")}: </span>
-                    {es.slice(0, 2).map(e => e.isVacant ? <span key={e.id} className="text-red-500">✗</span> : <span key={e.id}>{e.readerName?.split(" ")[0]} </span>)}
+                    {es.slice(0, 2).map(e => e.isVacant ? <span key={e.id} className="text-red-500">✗ </span> : <span key={e.id}>{e.readerName?.split(" ")[0]} </span>)}
                     {es.length > 2 && <span className="text-muted-foreground">+{es.length - 2}</span>}
                   </div>
                 ))}
-                {bySchedule.size > 2 && (
-                  <div className="text-[10px] text-muted-foreground">+{bySchedule.size - 2} misas</div>
-                )}
+                {bySchedule.size > 2 && <div className="text-[10px] text-muted-foreground">+{bySchedule.size - 2} misas</div>}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Day detail panel */}
       <AnimatePresence>
         {selectedDate && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-          >
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
             <Card className="p-5">
               <div className="flex justify-between items-center mb-4">
                 <div>
@@ -397,38 +430,28 @@ function MonthlyCalendar({ entries, onEditEntry }: MonthlyCalendarProps) {
                 <p className="text-muted-foreground text-sm">No hay asignaciones para este día.</p>
               ) : (
                 <div className="space-y-4">
-                  {/* Group by schedule */}
                   {(() => {
-                    const scheduleGroups = new Map<string, CalendarEntry[]>();
+                    const groups = new Map<string, CalendarEntry[]>();
                     for (const e of selectedEntries) {
                       const key = parseSchedulePart(e.role);
-                      if (!scheduleGroups.has(key)) scheduleGroups.set(key, []);
-                      scheduleGroups.get(key)!.push(e);
+                      if (!groups.has(key)) groups.set(key, []);
+                      groups.get(key)!.push(e);
                     }
-                    return Array.from(scheduleGroups.entries()).map(([schedName, groupEntries]) => (
+                    return Array.from(groups.entries()).map(([schedName, grp]) => (
                       <div key={schedName}>
                         <h5 className="text-sm font-semibold text-primary mb-2 flex items-center gap-1">
                           <Clock className="w-4 h-4" /> {schedName}
                         </h5>
                         <table className="w-full text-sm">
                           <tbody>
-                            {groupEntries.map(entry => (
+                            {grp.map(entry => (
                               <tr key={entry.id} className="border-b border-border/40 last:border-0">
                                 <td className="py-2 pr-3 text-muted-foreground w-40">{parseRolePart(entry.role)}</td>
-                                <td className="py-2 font-medium flex-1">
-                                  {entry.isVacant ? (
-                                    <Badge variant="destructive" className="text-xs">🚨 VACANTE</Badge>
-                                  ) : (
-                                    <span className="font-serif">{entry.readerName}</span>
-                                  )}
+                                <td className="py-2 font-medium">
+                                  {entry.isVacant ? <Badge variant="destructive" className="text-xs">🚨 VACANTE</Badge> : <span className="font-serif">{entry.readerName}</span>}
                                 </td>
                                 <td className="py-2 text-right">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-xs text-primary"
-                                    onClick={() => onEditEntry(entry)}
-                                  >
+                                  <Button variant="ghost" size="sm" className="text-xs text-primary" onClick={() => onEditEntry(entry)}>
                                     <Edit2 className="w-3 h-3 mr-1" /> Editar
                                   </Button>
                                 </td>
@@ -449,94 +472,199 @@ function MonthlyCalendar({ entries, onEditEntry }: MonthlyCalendarProps) {
   );
 }
 
-// ─── CalendarTab ─────────────────────────────────────────────────────────
+// ─── Edit Modal (Reassign / Swap) ────────────────────────────────────────────
+
+interface EditModalProps {
+  entry: CalendarEntry | null;
+  sameDay: CalendarEntry[];
+  readers: Reader[];
+  allUnavailability: any[];
+  onClose: () => void;
+  onReassign: (entryId: number, readerId: number | null, comment?: string) => void;
+  onSwap: (a: number, b: number) => void;
+  isLoading: boolean;
+}
+
+function EditModal({ entry, sameDay, readers, allUnavailability, onClose, onReassign, onSwap, isLoading }: EditModalProps) {
+  const [tab, setTab] = useState<"reassign" | "swap">("reassign");
+  const [selectedReaderId, setSelectedReaderId] = useState<string>(entry?.readerId?.toString() ?? "0");
+  const [comment, setComment] = useState<string>(entry?.logisticComment ?? "");
+  const [swapTargetId, setSwapTargetId] = useState<string>("");
+
+  if (!entry) return null;
+
+  const blockedOnDate = new Set(
+    allUnavailability.filter((u: any) => u.blockedDate === entry.date).map((u: any) => u.readerId)
+  );
+  const availableReaders = readers.filter(r => !blockedOnDate.has(r.id));
+  const otherEntries = sameDay.filter(e => e.id !== entry.id);
+
+  return (
+    <Dialog isOpen onClose={onClose} title="Editar Asignación" wide>
+      <div className="space-y-5">
+        <div className="bg-secondary/50 rounded-xl p-4 space-y-1">
+          <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Entrada seleccionada</p>
+          <p className="font-medium">{formatDate(entry.date)} · {parseSchedulePart(entry.role)}</p>
+          <p className="text-sm font-serif">{parseRolePart(entry.role)}</p>
+          <p className="text-sm">Actual: <span className={cn("font-semibold", entry.isVacant ? "text-destructive" : "text-primary")}>{entry.isVacant ? "VACANTE" : entry.readerName}</span></p>
+        </div>
+
+        <div className="flex rounded-xl overflow-hidden border border-border">
+          <button onClick={() => setTab("reassign")} className={cn("flex-1 py-2.5 text-sm font-medium transition-colors", tab === "reassign" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}>
+            <Edit2 className="w-4 h-4 inline mr-1" /> Reasignar
+          </button>
+          <button onClick={() => setTab("swap")} disabled={otherEntries.length === 0} className={cn("flex-1 py-2.5 text-sm font-medium transition-colors", tab === "swap" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}>
+            <ArrowLeftRight className="w-4 h-4 inline mr-1" /> Intercambiar
+          </button>
+        </div>
+
+        {tab === "reassign" && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Lector</label>
+              <SelectEl value={selectedReaderId} onChange={setSelectedReaderId} options={[{ label: "-- VACANTE --", value: "0" }, ...availableReaders.map(r => ({ label: r.name + (r.level === "Experto" ? " ★" : ""), value: r.id.toString() }))]} />
+              {blockedOnDate.size > 0 && <p className="text-xs text-amber-700 mt-1 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{blockedOnDate.size} lector(es) no disponibles (ocultos).</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Comentario logístico</label>
+              <Input value={comment} onChange={e => setComment(e.target.value)} placeholder="Ej. Llegar 20 min antes" className="h-10" />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" className="flex-1" onClick={onClose}>Cancelar</Button>
+              <Button className="flex-1" disabled={isLoading} onClick={() => { onReassign(entry.id, selectedReaderId === "0" ? null : Number(selectedReaderId), comment); onClose(); }}>
+                {isLoading ? "Guardando..." : "Confirmar"}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {tab === "swap" && (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">Elige otra asignación del mismo día para intercambiar lectores.</p>
+            <SelectEl value={swapTargetId} onChange={setSwapTargetId} placeholder="-- Seleccionar --" options={otherEntries.map(e => ({ label: `${parseRolePart(e.role)} → ${e.isVacant ? "VACANTE" : e.readerName}`, value: e.id.toString() }))} />
+            {swapTargetId && (() => {
+              const target = otherEntries.find(e => e.id.toString() === swapTargetId);
+              return (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-900">
+                  <p className="font-medium mb-1">Resultado del intercambio:</p>
+                  <ul className="space-y-0.5">
+                    <li>• {parseRolePart(entry.role)} → <strong>{target?.isVacant ? "VACANTE" : target?.readerName}</strong></li>
+                    <li>• {parseRolePart(target?.role ?? "")} → <strong>{entry.isVacant ? "VACANTE" : entry.readerName}</strong></li>
+                  </ul>
+                </div>
+              );
+            })()}
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" className="flex-1" onClick={onClose}>Cancelar</Button>
+              <Button className="flex-1" disabled={isLoading || !swapTargetId} onClick={() => { if (swapTargetId) { onSwap(entry.id, Number(swapTargetId)); onClose(); } }}>
+                {isLoading ? "Intercambiando..." : "Confirmar Intercambio"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </Dialog>
+  );
+}
+
+// ─── CalendarTab ─────────────────────────────────────────────────────────────
 
 function CalendarTab() {
   const { data: calendar = [], isLoading } = useCalendar();
   const { data: readers = [] } = useReaders();
   const { data: allUnavailability = [] } = useUnavailability();
+  const { data: schedules = [] } = useSchedules();
   const { updateEntry, swap } = useCalendarMutations();
 
-  const [viewMode, setViewMode] = useState<"table" | "monthly">("table");
+  const [viewMode, setViewMode] = useState<"tabla" | "mensual" | "cuadricula">("cuadricula");
   const [editingEntry, setEditingEntry] = useState<CalendarEntry | null>(null);
-
-  const handleReassign = (entryId: number, readerId: number | null) => {
-    updateEntry.mutate({
-      id: entryId,
-      data: { readerId: readerId ?? undefined, isVacant: readerId === null }
-    });
-  };
-
-  const handleSwap = (entryIdA: number, entryIdB: number) => {
-    swap.mutate({ data: { entryIdA, entryIdB } });
-  };
 
   const sameDayEntries = useMemo(() => {
     if (!editingEntry) return [];
     return calendar.filter(e => e.date === editingEntry.date);
   }, [editingEntry, calendar]);
 
-  const generateWhatsAppMessage = () => {
-    let msg = `🙏 *Calendario Litúrgico de Lectores*\n*Parroquia Santo Cristo de Esquipulas*\n\n`;
-    let currentDate = "";
-    let currentSchedule = "";
+  const generatedAt = getGeneratedAt(calendar);
+
+  const handleReassign = (entryId: number, readerId: number | null, logisticComment?: string) => {
+    updateEntry.mutate({ id: entryId, data: { readerId: readerId ?? undefined, isVacant: readerId === null, logisticComment: logisticComment ?? null } });
+  };
+
+  const handleSwap = (a: number, b: number) => {
+    swap.mutate({ data: { entryIdA: a, entryIdB: b } });
+  };
+
+  const generateWhatsApp = () => {
+    let msg = `🙏 *CALENDARIO LITÚRGICO DE LECTORES*\n`;
+    msg += `*Parroquia Santo Cristo de Esquipulas*\n`;
+    if (generatedAt) msg += `_Generado el: ${generatedAt}_\n`;
+    msg += `\n`;
+
+    let curDate = "";
+    let curSched = "";
     const sorted = [...calendar].sort((a, b) => a.date.localeCompare(b.date) || a.role.localeCompare(b.role));
 
     sorted.forEach(c => {
       const schedPart = parseSchedulePart(c.role);
-      if (c.date !== currentDate) {
+      if (c.date !== curDate) {
         msg += `\n📅 *${formatDate(c.date)}*\n`;
-        currentDate = c.date;
-        currentSchedule = "";
+        curDate = c.date;
+        curSched = "";
       }
-      if (schedPart !== currentSchedule) {
+      if (schedPart !== curSched) {
         msg += `  ⏰ _${schedPart}_\n`;
-        currentSchedule = schedPart;
+        curSched = schedPart;
       }
-      msg += `   • ${parseRolePart(c.role)}: ${c.isVacant ? "🚨 VACANTE" : c.readerName}\n`;
+      msg += `   • ${parseRolePart(c.role)}: ${c.isVacant ? "🚨 VACANTE" : c.readerName}`;
+      if (c.logisticComment) msg += ` _(${c.logisticComment})_`;
+      msg += `\n`;
     });
 
+    msg += `\n🙏 _Dios habla cada día; el reto es aprender a escucharlo._ ❤️`;
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   };
 
-  if (isLoading) {
-    return <div className="py-12 flex justify-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>;
-  }
+  if (isLoading) return <div className="py-12 flex justify-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>;
+
+  const VIEW_OPTIONS = [
+    { key: "cuadricula", label: "Cuadrícula", icon: <Grid3X3 className="w-3.5 h-3.5" /> },
+    { key: "tabla", label: "Lista", icon: <TableIcon className="w-3.5 h-3.5" /> },
+    { key: "mensual", label: "Mensual", icon: <CalIcon className="w-3.5 h-3.5" /> },
+  ] as const;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-2xl font-serif">Calendario Asignado</h2>
-        <div className="flex gap-2 flex-wrap">
-          {/* View toggle */}
+        <div>
+          <h2 className="text-2xl font-serif">Calendario Asignado</h2>
+          {generatedAt && (
+            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+              <Clock className="w-3 h-3" /> Generado el: <span className="font-semibold">{generatedAt}</span>
+            </p>
+          )}
+        </div>
+        <div className="flex gap-2 flex-wrap items-center">
           <div className="flex rounded-xl border border-border overflow-hidden">
-            <button
-              onClick={() => setViewMode("table")}
-              className={cn("px-3 py-2 text-xs flex items-center gap-1 transition-colors", viewMode === "table" ? "bg-primary text-white" : "bg-white text-muted-foreground hover:bg-muted")}
-            >
-              <TableIcon className="w-3.5 h-3.5" /> Tabla
-            </button>
-            <button
-              onClick={() => setViewMode("monthly")}
-              className={cn("px-3 py-2 text-xs flex items-center gap-1 transition-colors", viewMode === "monthly" ? "bg-primary text-white" : "bg-white text-muted-foreground hover:bg-muted")}
-            >
-              <CalIcon className="w-3.5 h-3.5" /> Mensual
-            </button>
+            {VIEW_OPTIONS.map(opt => (
+              <button key={opt.key} onClick={() => setViewMode(opt.key)} className={cn("px-3 py-2 text-xs flex items-center gap-1 transition-colors", viewMode === opt.key ? "bg-primary text-white" : "bg-white text-muted-foreground hover:bg-muted")}>
+                {opt.icon} {opt.label}
+              </button>
+            ))}
           </div>
-          <Button onClick={generateWhatsAppMessage} variant="outline" size="sm" className="gap-1.5 bg-green-50 text-green-700 border-green-200 hover:bg-green-100">
+          <Button onClick={generateWhatsApp} variant="outline" size="sm" className="gap-1.5 bg-green-50 text-green-700 border-green-200 hover:bg-green-100">
             <MessageCircle className="w-4 h-4" /> WhatsApp
           </Button>
         </div>
       </div>
 
-      {viewMode === "monthly" ? (
-        <MonthlyCalendar entries={calendar} onEditEntry={setEditingEntry} />
-      ) : (
+      {viewMode === "cuadricula" && <WeekGridView entries={calendar} schedules={schedules} onEditEntry={setEditingEntry} />}
+      {viewMode === "mensual" && <MonthlyCalendar entries={calendar} onEditEntry={setEditingEntry} />}
+      {viewMode === "tabla" && (
         <Card className="overflow-x-auto border border-primary/20 shadow-sm">
           <table className="w-full text-sm text-left">
             <thead className="border-b-2 border-primary/25">
               <tr>
-                {["Fecha", "Temporada", "Misa", "Rol", "Lector Asignado", ""].map(h => (
+                {["Fecha", "Temporada", "Misa", "Rol", "Lector Asignado", "Comentario", ""].map(h => (
                   <th key={h} className="px-4 py-3 font-semibold text-primary text-sm bg-secondary/70 whitespace-nowrap" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{h}</th>
                 ))}
               </tr>
@@ -549,34 +677,23 @@ function CalendarTab() {
                 return (
                   <tr key={entry.id} className="hover:brightness-95 transition-colors" style={{ background: colors?.bg }}>
                     <td className="px-4 py-3 font-medium whitespace-nowrap">{formatDate(entry.date)}</td>
-                    <td className="px-4 py-3">
-                      <Badge className={colors?.badge ?? ""}>{entry.liturgicalSeason ?? season.name}</Badge>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">{parseSchedulePart(entry.role)}</td>
+                    <td className="px-4 py-3"><Badge className={colors?.badge ?? ""}>{entry.liturgicalSeason ?? season.name}</Badge></td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground max-w-[140px] truncate">{parseSchedulePart(entry.role)}</td>
                     <td className="px-4 py-3 font-medium">{parseRolePart(entry.role)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        {entry.isVacant ? (
-                          <Badge variant="destructive" className="text-xs font-bold uppercase tracking-widest">🚨 VACANTE</Badge>
-                        ) : (
-                          <span className="font-medium" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{entry.readerName}</span>
-                        )}
+                        {entry.isVacant ? <Badge variant="destructive" className="text-xs font-bold uppercase tracking-widest">🚨 VACANTE</Badge> : <span className="font-medium" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{entry.readerName}</span>}
                         {!entry.isVacant && conflict && <AlertCircle className="w-4 h-4 text-amber-500" title="Asignado en misa contigua" />}
                       </div>
                     </td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground italic">{entry.logisticComment || "—"}</td>
                     <td className="px-4 py-3">
-                      <Button size="sm" variant="ghost" onClick={() => setEditingEntry(entry)} className="text-xs gap-1">
-                        <Edit2 className="w-3 h-3" /> Editar
-                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setEditingEntry(entry)} className="text-xs gap-1"><Edit2 className="w-3 h-3" /> Editar</Button>
                     </td>
                   </tr>
                 );
               })}
-              {calendar.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">No hay fechas en el calendario. Usa "Generar" para crear asignaciones.</td>
-                </tr>
-              )}
+              {calendar.length === 0 && <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">No hay asignaciones. Usa "Generar" para crear el calendario.</td></tr>}
             </tbody>
           </table>
         </Card>
@@ -596,7 +713,7 @@ function CalendarTab() {
   );
 }
 
-// ─── GenerateTab ──────────────────────────────────────────────────────────
+// ─── GenerateTab ──────────────────────────────────────────────────────────────
 
 function GenerateTab() {
   const { data: schedules = [] } = useSchedules();
@@ -622,22 +739,22 @@ function GenerateTab() {
           <Sparkles className="w-6 h-6 text-accent" /> Asignación Inteligente
         </h2>
         <p className="text-muted-foreground mt-2 text-sm">
-          El algoritmo asigna lectores distintos a cada rol por día, respeta indisponibilidades y aplica la regla de proximidad (Sáb PM → Dom AM). Los roles se toman de la Configuración de Horarios.
+          El algoritmo asigna lectores únicos por rol y día, respeta indisponibilidades y aplica la regla de proximidad (Sáb P.M. → bloquea Dom A.M.). Los roles se toman de la Configuración.
         </p>
       </div>
 
-      {/* Preview of what will be generated */}
       {activeSchedules.length > 0 && (
         <Card className="p-4">
           <p className="text-sm font-semibold mb-3 text-primary">Misas activas que se generarán:</p>
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             {activeSchedules.map((s: MassSchedule) => (
               <div key={s.id} className="flex items-start gap-2 text-sm">
                 <Clock className="w-4 h-4 text-accent mt-0.5 shrink-0" />
                 <div>
                   <span className="font-medium">{s.name}</span>
-                  <span className="text-muted-foreground"> · {s.time} · </span>
-                  <span className="text-xs text-muted-foreground">{s.roles?.join(", ")}</span>
+                  <span className="text-muted-foreground"> · </span>
+                  <span className="font-mono font-semibold text-primary">{s.time}</span>
+                  <span className="text-muted-foreground text-xs ml-2">{(s.roles ?? []).join(", ")}</span>
                 </div>
               </div>
             ))}
@@ -654,11 +771,7 @@ function GenerateTab() {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Período</label>
-              <SelectEl
-                value={formData.period}
-                onChange={v => setFormData({ ...formData, period: v as any })}
-                options={[{ label: "1 Mes", value: "1month" }, { label: "15 Días", value: "15days" }]}
-              />
+              <SelectEl value={formData.period} onChange={v => setFormData({ ...formData, period: v as any })} options={[{ label: "1 Mes", value: "1month" }, { label: "15 Días", value: "15days" }]} />
             </div>
           </div>
           <Button type="submit" className="w-full" size="lg" disabled={generate.isPending}>
@@ -670,7 +783,7 @@ function GenerateTab() {
   );
 }
 
-// ─── ConfigTab ────────────────────────────────────────────────────────────
+// ─── ConfigTab ────────────────────────────────────────────────────────────────
 
 function ConfigTab() {
   const { data: schedules = [], isLoading } = useSchedules();
@@ -679,24 +792,12 @@ function ConfigTab() {
   const [editTime, setEditTime] = useState("");
   const [editName, setEditName] = useState("");
 
-  const handleEdit = (s: MassSchedule) => {
-    setEditingId(s.id);
-    setEditTime(s.time);
-    setEditName(s.name);
-  };
-
   const handleSave = (id: number) => {
     update.mutate({ id, data: { time: editTime, name: editName } });
     setEditingId(null);
   };
 
-  const handleToggleActive = (s: MassSchedule) => {
-    update.mutate({ id: s.id, data: { isActive: !s.isActive } });
-  };
-
-  if (isLoading) {
-    return <div className="py-12 flex justify-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>;
-  }
+  if (isLoading) return <div className="py-12 flex justify-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -705,7 +806,7 @@ function ConfigTab() {
           <Settings className="w-6 h-6 text-accent" /> Configuración de Horarios
         </h2>
         <p className="text-muted-foreground mt-2 text-sm">
-          Configura la hora de cada misa y activa o desactiva jornadas. Los cambios se reflejan en el próximo calendario generado y en los mensajes de WhatsApp.
+          Modifica la hora de cada misa y activa o desactiva jornadas. Los cambios se reflejan automáticamente en los mensajes de WhatsApp del calendario ya generado y en futuras generaciones.
         </p>
       </div>
 
@@ -713,15 +814,13 @@ function ConfigTab() {
         {schedules.map((s: MassSchedule) => (
           <Card key={s.id} className={cn("p-4 transition-opacity", !s.isActive && "opacity-60")}>
             <div className="flex items-start gap-3">
-              {/* Active toggle */}
               <button
-                onClick={() => handleToggleActive(s)}
+                onClick={() => update.mutate({ id: s.id, data: { isActive: !s.isActive } })}
                 title={s.isActive ? "Desactivar" : "Activar"}
-                className={cn("mt-1 shrink-0 w-10 h-6 rounded-full transition-colors border", s.isActive ? "bg-primary/20 border-primary/40" : "bg-muted border-border")}
+                className={cn("mt-1 shrink-0 w-10 h-6 rounded-full transition-colors border relative", s.isActive ? "bg-primary/20 border-primary/40" : "bg-muted border-border")}
               >
-                <span className={cn("block w-4 h-4 rounded-full transition-transform mx-1", s.isActive ? "bg-primary translate-x-4" : "bg-muted-foreground translate-x-0")} />
+                <span className={cn("absolute top-1 left-1 w-4 h-4 rounded-full transition-transform", s.isActive ? "bg-primary translate-x-4" : "bg-muted-foreground")} />
               </button>
-
               <div className="flex-1 min-w-0">
                 {editingId === s.id ? (
                   <div className="space-y-3">
@@ -744,21 +843,15 @@ function ConfigTab() {
                       <h4 className="font-semibold">{s.name}</h4>
                       <div className="flex items-center gap-2">
                         <span className="text-lg font-mono font-bold text-primary">{s.time}</span>
-                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => handleEdit(s)}>
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => { setEditingId(s.id); setEditTime(s.time); setEditName(s.name); }}>
                           <Edit2 className="w-3.5 h-3.5" />
                         </Button>
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-1 mt-2">
-                      {(s.roles ?? []).map((role: string) => (
-                        <Badge key={role} variant="outline" className="text-xs">{role}</Badge>
-                      ))}
+                      {(s.roles ?? []).map((role: string) => <Badge key={role} variant="outline" className="text-xs">{role}</Badge>)}
                     </div>
-                    {!s.isActive && (
-                      <p className="text-xs text-amber-700 mt-1 flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" /> Esta misa está desactivada y no se incluirá en la generación.
-                      </p>
-                    )}
+                    {!s.isActive && <p className="text-xs text-amber-700 mt-1 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Misa desactivada.</p>}
                   </>
                 )}
               </div>
@@ -768,61 +861,13 @@ function ConfigTab() {
       </div>
 
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
-        <strong>Nota:</strong> Al cambiar la hora de una misa, los mensajes de WhatsApp del calendario ya generado reflejarán la nueva hora automáticamente. Para reflejar los cambios en las asignaciones, regenera el calendario.
+        <strong>Nota:</strong> Los mensajes de WhatsApp ya reflejan el horario actual. Para actualizar asignaciones existentes al nuevo horario, regenera el calendario.
       </div>
     </div>
   );
 }
 
-// ─── Admin Page ────────────────────────────────────────────────────────────
-
-const TABS = [
-  { key: "readers", label: "Lectores" },
-  { key: "calendar", label: "Calendario" },
-  { key: "generate", label: "Generar" },
-  { key: "config", label: "Configuración" },
-] as const;
-
-type TabKey = (typeof TABS)[number]["key"];
-
-export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<TabKey>("readers");
-
-  return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-wrap gap-2 p-1.5 bg-muted/50 rounded-2xl w-full border border-border">
-        {TABS.map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={cn(
-              "px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-300 relative flex-1",
-              activeTab === tab.key ? "text-primary" : "text-muted-foreground hover:text-foreground hover:bg-black/5"
-            )}
-          >
-            {activeTab === tab.key && (
-              <motion.div layoutId="activeTab" className="absolute inset-0 bg-white rounded-xl shadow-sm border border-border" style={{ zIndex: -1 }} />
-            )}
-            <span className="relative z-10">{tab.label}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="min-h-[400px]">
-        <AnimatePresence mode="wait">
-          <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
-            {activeTab === "readers" && <ReadersTab />}
-            {activeTab === "calendar" && <CalendarTab />}
-            {activeTab === "generate" && <GenerateTab />}
-            {activeTab === "config" && <ConfigTab />}
-          </motion.div>
-        </AnimatePresence>
-      </div>
-    </div>
-  );
-}
-
-// ─── ReadersTab ────────────────────────────────────────────────────────────
+// ─── ReadersTab ───────────────────────────────────────────────────────────────
 
 function ReadersTab() {
   const { data: readers = [], isLoading } = useReaders();
@@ -833,13 +878,7 @@ function ReadersTab() {
 
   const openCreate = () => { setEditingReader(null); setFormData({ name: "", whatsapp: "", level: "Principiante" }); setIsModalOpen(true); };
   const openEdit = (r: Reader) => { setEditingReader(r); setFormData({ name: r.name, whatsapp: r.whatsapp, level: r.level }); setIsModalOpen(true); };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingReader) update.mutate({ id: editingReader.id, data: formData });
-    else create.mutate({ data: formData as CreateReaderInput });
-    setIsModalOpen(false);
-  };
+  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); if (editingReader) update.mutate({ id: editingReader.id, data: formData }); else create.mutate({ data: formData as CreateReaderInput }); setIsModalOpen(false); };
 
   if (isLoading) return <div className="py-12 flex justify-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>;
 
@@ -849,7 +888,6 @@ function ReadersTab() {
         <h2 className="text-2xl font-serif">Directorio de Lectores</h2>
         <Button onClick={openCreate} className="gap-2"><Plus className="w-5 h-5" /> Nuevo Lector</Button>
       </div>
-
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {readers.map(reader => (
           <Card key={reader.id} className="p-5 flex flex-col hover:shadow-md transition-shadow">
@@ -870,7 +908,6 @@ function ReadersTab() {
         ))}
         {readers.length === 0 && <div className="col-span-full py-12 text-center text-muted-foreground">No hay lectores registrados aún.</div>}
       </div>
-
       <Dialog isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingReader ? "Editar Lector" : "Nuevo Lector"}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -879,7 +916,7 @@ function ReadersTab() {
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">WhatsApp</label>
-            <Input required value={formData.whatsapp} onChange={e => setFormData({ ...formData, whatsapp: e.target.value })} placeholder="Ej. +34600000000" />
+            <Input required value={formData.whatsapp} onChange={e => setFormData({ ...formData, whatsapp: e.target.value })} placeholder="Ej. +50200000000" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Nivel</label>
@@ -891,6 +928,42 @@ function ReadersTab() {
           </div>
         </form>
       </Dialog>
+    </div>
+  );
+}
+
+// ─── Admin Page ───────────────────────────────────────────────────────────────
+
+const TABS = [
+  { key: "readers",  label: "Lectores" },
+  { key: "calendar", label: "Calendario" },
+  { key: "generate", label: "Generar" },
+  { key: "config",   label: "Configuración" },
+] as const;
+type TabKey = (typeof TABS)[number]["key"];
+
+export default function AdminPage() {
+  const [activeTab, setActiveTab] = useState<TabKey>("readers");
+  return (
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex flex-wrap gap-2 p-1.5 bg-muted/50 rounded-2xl w-full border border-border">
+        {TABS.map(tab => (
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={cn("px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-300 relative flex-1", activeTab === tab.key ? "text-primary" : "text-muted-foreground hover:text-foreground hover:bg-black/5")}>
+            {activeTab === tab.key && <motion.div layoutId="activeTab" className="absolute inset-0 bg-white rounded-xl shadow-sm border border-border" style={{ zIndex: -1 }} />}
+            <span className="relative z-10">{tab.label}</span>
+          </button>
+        ))}
+      </div>
+      <div className="min-h-[400px]">
+        <AnimatePresence mode="wait">
+          <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
+            {activeTab === "readers" && <ReadersTab />}
+            {activeTab === "calendar" && <CalendarTab />}
+            {activeTab === "generate" && <GenerateTab />}
+            {activeTab === "config" && <ConfigTab />}
+          </motion.div>
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
