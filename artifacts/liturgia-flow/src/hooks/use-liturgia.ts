@@ -1,13 +1,15 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { 
-  useGetReaders, 
-  useCreateReader, 
-  useUpdateReader, 
+import {
+  useGetReaders,
+  useCreateReader,
+  useUpdateReader,
   useDeleteReader,
   useGetCalendar,
   useGenerateCalendar,
   useUpdateCalendarEntry,
   useSwapCalendarEntries,
+  usePublishCalendar,
+  useGetCalendarStats,
   useGetUnavailability,
   useCreateUnavailability,
   useDeleteUnavailability,
@@ -58,8 +60,12 @@ export function useReaderMutations() {
   return { create, update, remove };
 }
 
-export function useCalendar(startDate?: string, endDate?: string) {
-  return useGetCalendar({ startDate, endDate });
+export function useCalendar(params?: { startDate?: string; endDate?: string; publishedOnly?: boolean }) {
+  return useGetCalendar(params);
+}
+
+export function useCalendarStats() {
+  return useGetCalendarStats();
 }
 
 export function useCalendarMutations() {
@@ -70,7 +76,8 @@ export function useCalendarMutations() {
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ["/api/calendar"] });
-        toast({ title: "Calendario generado", description: "Las asignaciones han sido creadas." });
+        queryClient.invalidateQueries({ queryKey: ["/api/calendar/stats"] });
+        toast({ title: "Calendario generado (borrador)", description: "Revisa el calendario y pulsa 'Publicar' cuando esté listo." });
       },
       onError: (err: any) => {
         const msg = err?.response?.data?.error ?? "No se pudo generar el calendario.";
@@ -83,6 +90,7 @@ export function useCalendarMutations() {
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ["/api/calendar"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/calendar/stats"] });
         toast({ title: "Asignación actualizada", description: "El cambio ha sido guardado." });
       },
       onError: (err: any) => {
@@ -105,7 +113,20 @@ export function useCalendarMutations() {
     }
   });
 
-  return { generate, updateEntry, swap };
+  const publish = usePublishCalendar({
+    mutation: {
+      onSuccess: (data: any) => {
+        queryClient.invalidateQueries({ queryKey: ["/api/calendar"] });
+        toast({
+          title: "¡Calendario publicado!",
+          description: `${data?.published ?? "Todas las"} asignaciones ahora son visibles para los lectores.`,
+        });
+      },
+      onError: () => toast({ title: "Error", description: "No se pudo publicar el calendario.", variant: "destructive" })
+    }
+  });
+
+  return { generate, updateEntry, swap, publish };
 }
 
 export function useUnavailability(readerId?: number) {

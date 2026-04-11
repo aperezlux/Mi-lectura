@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * LiturgiaFlow Pro API
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
@@ -26,7 +26,9 @@ import type {
   GetUnavailabilityParams,
   HealthStatus,
   MassSchedule,
+  PublishResult,
   Reader,
+  ReaderStat,
   SwapEntriesInput,
   Unavailability,
   UpdateCalendarEntryInput,
@@ -1057,6 +1059,162 @@ export const useGenerateCalendar = <
 > => {
   return useMutation(getGenerateCalendarMutationOptions(options));
 };
+
+/**
+ * @summary Publish all draft calendar entries so readers can see them
+ */
+export const getPublishCalendarUrl = () => {
+  return `/api/calendar/publish`;
+};
+
+export const publishCalendar = async (
+  options?: RequestInit,
+): Promise<PublishResult> => {
+  return customFetch<PublishResult>(getPublishCalendarUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getPublishCalendarMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof publishCalendar>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof publishCalendar>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["publishCalendar"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof publishCalendar>>,
+    void
+  > = () => {
+    return publishCalendar(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PublishCalendarMutationResult = NonNullable<
+  Awaited<ReturnType<typeof publishCalendar>>
+>;
+
+export type PublishCalendarMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Publish all draft calendar entries so readers can see them
+ */
+export const usePublishCalendar = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof publishCalendar>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof publishCalendar>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getPublishCalendarMutationOptions(options));
+};
+
+/**
+ * @summary Get reader participation statistics
+ */
+export const getGetCalendarStatsUrl = () => {
+  return `/api/calendar/stats`;
+};
+
+export const getCalendarStats = async (
+  options?: RequestInit,
+): Promise<ReaderStat[]> => {
+  return customFetch<ReaderStat[]>(getGetCalendarStatsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetCalendarStatsQueryKey = () => {
+  return [`/api/calendar/stats`] as const;
+};
+
+export const getGetCalendarStatsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCalendarStats>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getCalendarStats>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetCalendarStatsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getCalendarStats>>
+  > = ({ signal }) => getCalendarStats({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCalendarStats>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCalendarStatsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCalendarStats>>
+>;
+export type GetCalendarStatsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get reader participation statistics
+ */
+
+export function useGetCalendarStats<
+  TData = Awaited<ReturnType<typeof getCalendarStats>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getCalendarStats>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCalendarStatsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Swap reader assignments between two calendar entries

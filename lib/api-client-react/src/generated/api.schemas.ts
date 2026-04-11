@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * LiturgiaFlow Pro API
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
 export interface HealthStatus {
   status: string;
@@ -125,6 +125,7 @@ export interface CalendarEntry {
   readerName?: string;
   logisticComment?: string;
   isVacant: boolean;
+  isPublished: boolean;
   versionTimestamp?: string;
   liturgicalSeason?: string;
 }
@@ -153,6 +154,20 @@ export interface SwapEntriesInput {
   entryIdB: number;
 }
 
+export interface PublishResult {
+  published: number;
+  publishedAt: string;
+}
+
+export interface ReaderStat {
+  readerId: number;
+  readerName: string;
+  totalAssignments: number;
+  lastRole?: string;
+  lastAssignedDate?: string;
+  debtScore: number;
+}
+
 export type GetUnavailabilityParams = {
   readerId?: number;
 };
@@ -160,4 +175,5 @@ export type GetUnavailabilityParams = {
 export type GetCalendarParams = {
   startDate?: string;
   endDate?: string;
+  publishedOnly?: boolean;
 };

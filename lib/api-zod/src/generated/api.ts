@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * LiturgiaFlow Pro API
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
 import * as zod from "zod";
 
@@ -179,6 +179,7 @@ export const UpdateScheduleResponse = zod.object({
 export const GetCalendarQueryParams = zod.object({
   startDate: zod.date().optional(),
   endDate: zod.date().optional(),
+  publishedOnly: zod.coerce.boolean().optional(),
 });
 
 export const GetCalendarResponseItem = zod.object({
@@ -192,6 +193,7 @@ export const GetCalendarResponseItem = zod.object({
   readerName: zod.string().optional(),
   logisticComment: zod.string().optional(),
   isVacant: zod.boolean(),
+  isPublished: zod.boolean(),
   versionTimestamp: zod.coerce.date().optional(),
   liturgicalSeason: zod.string().optional(),
 });
@@ -216,10 +218,32 @@ export const GenerateCalendarResponseItem = zod.object({
   readerName: zod.string().optional(),
   logisticComment: zod.string().optional(),
   isVacant: zod.boolean(),
+  isPublished: zod.boolean(),
   versionTimestamp: zod.coerce.date().optional(),
   liturgicalSeason: zod.string().optional(),
 });
 export const GenerateCalendarResponse = zod.array(GenerateCalendarResponseItem);
+
+/**
+ * @summary Publish all draft calendar entries so readers can see them
+ */
+export const PublishCalendarResponse = zod.object({
+  published: zod.number(),
+  publishedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Get reader participation statistics
+ */
+export const GetCalendarStatsResponseItem = zod.object({
+  readerId: zod.number(),
+  readerName: zod.string(),
+  totalAssignments: zod.number(),
+  lastRole: zod.string().optional(),
+  lastAssignedDate: zod.string().optional(),
+  debtScore: zod.number(),
+});
+export const GetCalendarStatsResponse = zod.array(GetCalendarStatsResponseItem);
 
 /**
  * @summary Swap reader assignments between two calendar entries
@@ -240,6 +264,7 @@ export const SwapCalendarEntriesResponseItem = zod.object({
   readerName: zod.string().optional(),
   logisticComment: zod.string().optional(),
   isVacant: zod.boolean(),
+  isPublished: zod.boolean(),
   versionTimestamp: zod.coerce.date().optional(),
   liturgicalSeason: zod.string().optional(),
 });
@@ -271,6 +296,7 @@ export const UpdateCalendarEntryResponse = zod.object({
   readerName: zod.string().optional(),
   logisticComment: zod.string().optional(),
   isVacant: zod.boolean(),
+  isPublished: zod.boolean(),
   versionTimestamp: zod.coerce.date().optional(),
   liturgicalSeason: zod.string().optional(),
 });

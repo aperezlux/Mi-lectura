@@ -8,7 +8,7 @@ import {
   DEFAULT_SCHEDULES,
   type DayType,
 } from "@workspace/db/schema";
-import { eq, gte, lte, and, sql, asc } from "drizzle-orm";
+import { eq, gte, lte, and, sql, asc, desc, isNotNull } from "drizzle-orm";
 import { getLiturgicalSeason } from "./liturgical";
 
 function addDays(dateStr: string, days: number): string {
@@ -19,6 +19,14 @@ function addDays(dateStr: string, days: number): string {
 
 function getDayOfWeek(dateStr: string): number {
   return new Date(dateStr + "T12:00:00").getDay(); // 0=Sun, 6=Sat
+}
+
+function getISOWeek(dateStr: string): string {
+  const d = new Date(dateStr + "T12:00:00");
+  const dow = d.getDay();
+  const diff = dow === 0 ? -6 : 1 - dow;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().split("T")[0];
 }
 
 function generateDateRange(startDate: string, period: "15days" | "1month"): string[] {
@@ -59,6 +67,11 @@ async function ensureDefaultSchedules() {
   if (existing.length === 0) {
     await db.insert(massSchedulesTable).values(DEFAULT_SCHEDULES);
   }
+}
+
+// Extract the role name part (before " - ")
+function parseRoleName(roleStr: string): string {
+  return roleStr.split(" - ")[0];
 }
 
 export async function generateAssignments(
@@ -130,6 +143,7 @@ export async function generateAssignments(
     blockedMap.get(row.readerId)!.add(row.blockedDate);
   }
 
+  // Historical total assignment counts (equity)
   const historicalCounts = await db
     .select({
       readerId: calendarTable.readerId,
@@ -141,14 +155,46 @@ export async function generateAssignments(
 
   const countMap = new Map<number, number>();
   for (const row of historicalCounts) {
-    if (row.readerId) {
-      countMap.set(row.readerId, Number(row.count));
-    }
+    if (row.readerId) countMap.set(row.readerId, Number(row.count));
   }
 
+  // Track session assignment counts
   const assignmentCountSession = new Map<number, number>();
   for (const reader of allReaders) {
     assignmentCountSession.set(reader.id, countMap.get(reader.id) ?? 0);
+  }
+
+  // Last role per reader (for role rotation) - look at last 4 weeks
+  const fourWeeksAgo = addDays(startDate, -28);
+  const recentRoleRows = await db
+    .select({
+      readerId: calendarTable.readerId,
+      role: calendarTable.role,
+      date: calendarTable.date,
+    })
+    .from(calendarTable)
+    .where(
+      and(
+        eq(calendarTable.isVacant, false),
+        gte(calendarTable.date, fourWeeksAgo),
+        isNotNull(calendarTable.readerId)
+      )
+    )
+    .orderBy(desc(calendarTable.date));
+
+  // Build: readerId → last role name
+  const lastRoleMap = new Map<number, string>();
+  // readerId → last week key they were assigned
+  const lastWeekMap = new Map<number, string>();
+
+  for (const row of recentRoleRows) {
+    if (!row.readerId) continue;
+    if (!lastRoleMap.has(row.readerId)) {
+      lastRoleMap.set(row.readerId, parseRoleName(row.role));
+    }
+    if (!lastWeekMap.has(row.readerId)) {
+      lastWeekMap.set(row.readerId, getISOWeek(row.date));
+    }
   }
 
   const results: Array<{
@@ -162,10 +208,12 @@ export async function generateAssignments(
 
   const dates = generateDateRange(startDate, period);
 
-  // Track session assignments: date -> set of readerIds used that day
+  // Track session: date → set of readerIds used that day
   const usedPerDay = new Map<string, Set<number>>();
-  // Proximity: date -> list of readerIds used in saturday_pm
+  // Proximity: date → list of readerIds used in saturday_pm
   const satPmReaders = new Map<string, number[]>();
+  // Session tracking of last week per reader (updates as we assign)
+  const sessionLastWeek = new Map<number, string>(lastWeekMap);
 
   for (const date of dates) {
     const dow = getDayOfWeek(date);
@@ -178,10 +226,11 @@ export async function generateAssignments(
       usedPerDay.set(date, new Set());
     }
 
+    const currentWeek = getISOWeek(date);
+
     for (const schedule of daySchedules) {
       const roles = ROLES_BY_DAY_TYPE[schedule.dayType as DayType] ?? [];
 
-      // For sunday_am, check previous saturday for proximity rule
       let proximityBlocked = new Set<number>();
       if (schedule.dayType === "sunday_am") {
         const prevSat = addDays(date, -1);
@@ -200,11 +249,26 @@ export async function generateAssignments(
             const proximityBlock = proximityBlocked.has(r.id);
             return !blocked && !usedThisDay && !proximityBlock;
           })
-          .sort(
-            (a, b) =>
-              (assignmentCountSession.get(a.id) ?? 0) -
-              (assignmentCountSession.get(b.id) ?? 0)
-          );
+          .sort((a, b) => {
+            // Primary: total assignment count (equity — less assigned = priority)
+            const countA = assignmentCountSession.get(a.id) ?? 0;
+            const countB = assignmentCountSession.get(b.id) ?? 0;
+            if (countA !== countB) return countA - countB;
+
+            // Secondary: week alternation — prefer readers not assigned this week
+            const lastWeekA = sessionLastWeek.get(a.id);
+            const lastWeekB = sessionLastWeek.get(b.id);
+            const sameWeekA = lastWeekA === currentWeek ? 1 : 0;
+            const sameWeekB = lastWeekB === currentWeek ? 1 : 0;
+            if (sameWeekA !== sameWeekB) return sameWeekA - sameWeekB;
+
+            // Tertiary: role rotation — prefer readers who had a different role last time
+            const lastA = lastRoleMap.get(a.id);
+            const lastB = lastRoleMap.get(b.id);
+            const sameRoleA = lastA === roleName ? 1 : 0;
+            const sameRoleB = lastB === roleName ? 1 : 0;
+            return sameRoleA - sameRoleB;
+          });
 
         const fullRole = `${roleName} - ${schedule.name} ${schedule.time}`;
 
@@ -224,6 +288,10 @@ export async function generateAssignments(
             chosen.id,
             (assignmentCountSession.get(chosen.id) ?? 0) + 1
           );
+          // Update last role and last week for this session
+          lastRoleMap.set(chosen.id, roleName);
+          sessionLastWeek.set(chosen.id, currentWeek);
+
           if (schedule.dayType === "saturday_pm") {
             if (!satPmReaders.has(date)) satPmReaders.set(date, []);
             satPmReaders.get(date)!.push(chosen.id);

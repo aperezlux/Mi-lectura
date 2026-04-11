@@ -6,8 +6,7 @@
  * OpenAPI spec version: 0.3.0
  */
 
-export interface UpdateCalendarEntryInput {
-  readerId?: number | null;
-  logisticComment?: string | null;
-  isVacant?: boolean;
+export interface PublishResult {
+  published: number;
+  publishedAt: Date;
 }

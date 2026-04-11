@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * LiturgiaFlow Pro API
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
 
 export * from "./calendarEntry";
@@ -18,8 +18,10 @@ export * from "./getUnavailabilityParams";
 export * from "./healthStatus";
 export * from "./massSchedule";
 export * from "./massScheduleDayType";
+export * from "./publishResult";
 export * from "./reader";
 export * from "./readerLevel";
+export * from "./readerStat";
 export * from "./swapEntriesInput";
 export * from "./unavailability";
 export * from "./updateCalendarEntryInput";

@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, Edit2, Trash2, MessageCircle, AlertCircle, Sparkles,
   Calendar as CalIcon, Table as TableIcon, Clock, ArrowLeftRight,
-  ChevronLeft, ChevronRight, Settings, Grid3X3
+  ChevronLeft, ChevronRight, Settings, Grid3X3, Globe, BarChart3,
+  TrendingUp, TrendingDown, Minus, SendHorizonal, CheckCircle2
 } from "lucide-react";
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval,
@@ -12,7 +13,7 @@ import {
 import { es } from "date-fns/locale";
 import {
   useReaders, useReaderMutations, useCalendar, useCalendarMutations,
-  useUnavailability, useSchedules, useScheduleMutations
+  useUnavailability, useSchedules, useScheduleMutations, useCalendarStats
 } from "@/hooks/use-liturgia";
 import { formatDate, getLiturgicalSeason, checkProximityConflict, cn } from "@/lib/utils";
 import type { Reader, CalendarEntry, CreateReaderInput, UpdateReaderInputLevel, MassSchedule } from "@workspace/api-client-react";
@@ -574,10 +575,11 @@ function CalendarTab() {
   const { data: readers = [] } = useReaders();
   const { data: allUnavailability = [] } = useUnavailability();
   const { data: schedules = [] } = useSchedules();
-  const { updateEntry, swap } = useCalendarMutations();
+  const { updateEntry, swap, publish } = useCalendarMutations();
 
   const [viewMode, setViewMode] = useState<"tabla" | "mensual" | "cuadricula">("cuadricula");
   const [editingEntry, setEditingEntry] = useState<CalendarEntry | null>(null);
+  const [showPublishConfirm, setShowPublishConfirm] = useState(false);
 
   const sameDayEntries = useMemo(() => {
     if (!editingEntry) return [];
@@ -585,6 +587,9 @@ function CalendarTab() {
   }, [editingEntry, calendar]);
 
   const generatedAt = getGeneratedAt(calendar);
+  const draftCount = calendar.filter(e => !e.isPublished).length;
+  const publishedCount = calendar.filter(e => e.isPublished).length;
+  const hasUnpublished = draftCount > 0;
 
   const handleReassign = (entryId: number, readerId: number | null, logisticComment?: string) => {
     updateEntry.mutate({ id: entryId, data: { readerId: readerId ?? undefined, isVacant: readerId === null, logisticComment: logisticComment ?? null } });
@@ -636,25 +641,43 @@ function CalendarTab() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-serif">Calendario Asignado</h2>
-          {generatedAt && (
-            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-              <Clock className="w-3 h-3" /> Generado el: <span className="font-semibold">{generatedAt}</span>
-            </p>
-          )}
-        </div>
-        <div className="flex gap-2 flex-wrap items-center">
-          <div className="flex rounded-xl border border-border overflow-hidden">
-            {VIEW_OPTIONS.map(opt => (
-              <button key={opt.key} onClick={() => setViewMode(opt.key)} className={cn("px-3 py-2 text-xs flex items-center gap-1 transition-colors", viewMode === opt.key ? "bg-primary text-white" : "bg-white text-muted-foreground hover:bg-muted")}>
-                {opt.icon} {opt.label}
-              </button>
-            ))}
+          <div>
+            <h2 className="text-2xl font-serif">Calendario Asignado</h2>
+            {generatedAt && (
+              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                <Clock className="w-3 h-3" /> Generado el: <span className="font-semibold">{generatedAt}</span>
+              </p>
+            )}
+            <div className="flex gap-2 mt-2 flex-wrap">
+              {publishedCount > 0 && (
+                <span className="text-xs bg-green-100 text-green-800 border border-green-200 rounded-full px-2.5 py-0.5 flex items-center gap-1 font-medium">
+                  <CheckCircle2 className="w-3 h-3" /> {publishedCount} publicadas
+                </span>
+              )}
+              {hasUnpublished && (
+                <span className="text-xs bg-amber-100 text-amber-800 border border-amber-200 rounded-full px-2.5 py-0.5 flex items-center gap-1 font-medium">
+                  <AlertCircle className="w-3 h-3" /> {draftCount} en borrador
+                </span>
+              )}
+            </div>
           </div>
-          <Button onClick={generateWhatsApp} variant="outline" size="sm" className="gap-1.5 bg-green-50 text-green-700 border-green-200 hover:bg-green-100">
-            <MessageCircle className="w-4 h-4" /> WhatsApp
-          </Button>
-        </div>
+          <div className="flex gap-2 flex-wrap items-center">
+            <div className="flex rounded-xl border border-border overflow-hidden">
+              {VIEW_OPTIONS.map(opt => (
+                <button key={opt.key} onClick={() => setViewMode(opt.key)} className={cn("px-3 py-2 text-xs flex items-center gap-1 transition-colors", viewMode === opt.key ? "bg-primary text-white" : "bg-white text-muted-foreground hover:bg-muted")}>
+                  {opt.icon} {opt.label}
+                </button>
+              ))}
+            </div>
+            {hasUnpublished && (
+              <Button onClick={() => setShowPublishConfirm(true)} size="sm" className="gap-1.5 bg-green-700 text-white border-green-800 hover:bg-green-800" disabled={publish.isPending}>
+                <Globe className="w-4 h-4" /> Publicar
+              </Button>
+            )}
+            <Button onClick={generateWhatsApp} variant="outline" size="sm" className="gap-1.5 bg-green-50 text-green-700 border-green-200 hover:bg-green-100">
+              <MessageCircle className="w-4 h-4" /> WhatsApp
+            </Button>
+          </div>
       </div>
 
       {viewMode === "cuadricula" && <WeekGridView entries={calendar} schedules={schedules} onEditEntry={setEditingEntry} />}

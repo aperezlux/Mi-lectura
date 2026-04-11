@@ -6,7 +6,11 @@
  * OpenAPI spec version: 0.3.0
  */
 
-export interface CreateUnavailabilityInput {
+export interface ReaderStat {
   readerId: number;
-  blockedDate: Date;
+  readerName: string;
+  totalAssignments: number;
+  lastRole?: string;
+  lastAssignedDate?: string;
+  debtScore: number;
 }

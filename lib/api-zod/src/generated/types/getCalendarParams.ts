@@ -3,10 +3,11 @@
  * Do not edit manually.
  * Api
  * LiturgiaFlow Pro API
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
 
 export type GetCalendarParams = {
   startDate?: Date;
   endDate?: Date;
+  publishedOnly?: boolean;
 };

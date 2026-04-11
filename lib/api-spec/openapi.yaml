@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Api
-  version: 0.2.0
+  version: 0.3.0
   description: LiturgiaFlow Pro API
 servers:
   - url: /api
@@ -233,6 +233,10 @@ paths:
           schema:
             type: string
             format: date
+        - name: publishedOnly
+          in: query
+          schema:
+            type: boolean
       responses:
         "200":
           description: Calendar assignments
@@ -269,6 +273,40 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+  /calendar/publish:
+    post:
+      operationId: publishCalendar
+      tags: [calendar]
+      summary: Publish all draft calendar entries so readers can see them
+      responses:
+        "200":
+          description: Published successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishResult"
+        "400":
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /calendar/stats:
+    get:
+      operationId: getCalendarStats
+      tags: [calendar]
+      summary: Get reader participation statistics
+      responses:
+        "200":
+          description: Reader stats
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReaderStat"
 
   /calendar/swap:
     post:
@@ -516,6 +554,8 @@ components:
           type: string
         isVacant:
           type: boolean
+        isPublished:
+          type: boolean
         versionTimestamp:
           type: string
           format: date-time
@@ -526,6 +566,7 @@ components:
         - date
         - role
         - isVacant
+        - isPublished
 
     GenerateCalendarInput:
       type: object
@@ -562,3 +603,36 @@ components:
       required:
         - entryIdA
         - entryIdB
+
+    PublishResult:
+      type: object
+      properties:
+        published:
+          type: integer
+        publishedAt:
+          type: string
+          format: date-time
+      required:
+        - published
+        - publishedAt
+
+    ReaderStat:
+      type: object
+      properties:
+        readerId:
+          type: integer
+        readerName:
+          type: string
+        totalAssignments:
+          type: integer
+        lastRole:
+          type: string
+        lastAssignedDate:
+          type: string
+        debtScore:
+          type: number
+      required:
+        - readerId
+        - readerName
+        - totalAssignments
+        - debtScore

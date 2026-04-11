@@ -12,6 +12,7 @@ export const calendarTable = pgTable("calendar", {
   readerId: integer("reader_id").references(() => readersTable.id, { onDelete: "set null" }),
   logisticComment: text("logistic_comment"),
   isVacant: boolean("is_vacant").notNull().default(false),
+  isPublished: boolean("is_published").notNull().default(false),
   liturgicalSeason: text("liturgical_season"),
   versionTimestamp: timestamp("version_timestamp").notNull().defaultNow(),
 });
@@ -22,6 +23,7 @@ export const insertCalendarSchema = createInsertSchema(calendarTable, {
   readerId: z.number().int().positive().optional().nullable(),
   logisticComment: z.string().max(500).optional().nullable(),
   isVacant: z.boolean().optional(),
+  isPublished: z.boolean().optional(),
   liturgicalSeason: z.string().optional().nullable(),
 }).omit({ id: true, versionTimestamp: true });
 

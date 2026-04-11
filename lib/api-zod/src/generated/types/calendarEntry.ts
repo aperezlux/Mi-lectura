@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * LiturgiaFlow Pro API
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
 
 export interface CalendarEntry {
@@ -17,6 +17,7 @@ export interface CalendarEntry {
   readerName?: string;
   logisticComment?: string;
   isVacant: boolean;
+  isPublished: boolean;
   versionTimestamp?: Date;
   liturgicalSeason?: string;
 }

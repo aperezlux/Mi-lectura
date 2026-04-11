@@ -7,7 +7,7 @@ import {
   unavailabilityTable,
   updateCalendarSchema,
 } from "@workspace/db/schema";
-import { eq, gte, lte, and } from "drizzle-orm";
+import { eq, gte, lte, and, sql, desc, isNotNull } from "drizzle-orm";
 import { z } from "zod/v4";
 import { generateAssignments } from "../lib/assignmentAlgorithm";
 
@@ -29,49 +29,62 @@ function addDays(dateStr: string, days: number): string {
   return d.toISOString().split("T")[0];
 }
 
-async function getEntriesWithJoins(filters?: { startDate?: string; endDate?: string }) {
-  const baseQuery = () =>
-    db
-      .select({
-        id: calendarTable.id,
-        date: calendarTable.date,
-        role: calendarTable.role,
-        scheduleId: calendarTable.scheduleId,
-        scheduleName: massSchedulesTable.name,
-        scheduleTime: massSchedulesTable.time,
-        readerId: calendarTable.readerId,
-        readerName: readersTable.name,
-        logisticComment: calendarTable.logisticComment,
-        isVacant: calendarTable.isVacant,
-        liturgicalSeason: calendarTable.liturgicalSeason,
-        versionTimestamp: calendarTable.versionTimestamp,
-      })
-      .from(calendarTable)
-      .leftJoin(readersTable, eq(calendarTable.readerId, readersTable.id))
-      .leftJoin(massSchedulesTable, eq(calendarTable.scheduleId, massSchedulesTable.id));
+function parseRoleName(roleStr: string): string {
+  return roleStr.split(" - ")[0];
+}
 
-  if (filters?.startDate && filters?.endDate) {
-    return baseQuery()
-      .where(
-        and(
-          gte(calendarTable.date, filters.startDate),
-          lte(calendarTable.date, filters.endDate)
-        )
-      )
+async function getEntriesWithJoins(filters?: {
+  startDate?: string;
+  endDate?: string;
+  publishedOnly?: boolean;
+}) {
+  const conditions: any[] = [];
+  if (filters?.startDate) conditions.push(gte(calendarTable.date, filters.startDate));
+  if (filters?.endDate) conditions.push(lte(calendarTable.date, filters.endDate));
+  if (filters?.publishedOnly) conditions.push(eq(calendarTable.isPublished, true));
+
+  const query = db
+    .select({
+      id: calendarTable.id,
+      date: calendarTable.date,
+      role: calendarTable.role,
+      scheduleId: calendarTable.scheduleId,
+      scheduleName: massSchedulesTable.name,
+      scheduleTime: massSchedulesTable.time,
+      readerId: calendarTable.readerId,
+      readerName: readersTable.name,
+      logisticComment: calendarTable.logisticComment,
+      isVacant: calendarTable.isVacant,
+      isPublished: calendarTable.isPublished,
+      liturgicalSeason: calendarTable.liturgicalSeason,
+      versionTimestamp: calendarTable.versionTimestamp,
+    })
+    .from(calendarTable)
+    .leftJoin(readersTable, eq(calendarTable.readerId, readersTable.id))
+    .leftJoin(massSchedulesTable, eq(calendarTable.scheduleId, massSchedulesTable.id));
+
+  if (conditions.length > 0) {
+    return query
+      .where(conditions.length === 1 ? conditions[0] : and(...conditions))
       .orderBy(calendarTable.date, massSchedulesTable.sortOrder, calendarTable.role);
   }
 
-  return baseQuery().orderBy(
-    calendarTable.date,
-    massSchedulesTable.sortOrder,
-    calendarTable.role
-  );
+  return query.orderBy(calendarTable.date, massSchedulesTable.sortOrder, calendarTable.role);
 }
 
+// GET /calendar
 router.get("/calendar", async (req, res) => {
   try {
-    const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
-    const rows = await getEntriesWithJoins({ startDate, endDate });
+    const { startDate, endDate, publishedOnly } = req.query as {
+      startDate?: string;
+      endDate?: string;
+      publishedOnly?: string;
+    };
+    const rows = await getEntriesWithJoins({
+      startDate,
+      endDate,
+      publishedOnly: publishedOnly === "true",
+    });
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "Failed to get calendar");
@@ -79,6 +92,71 @@ router.get("/calendar", async (req, res) => {
   }
 });
 
+// GET /calendar/stats — reader participation statistics
+router.get("/calendar/stats", async (req, res) => {
+  try {
+    const allReaders = await db.select().from(readersTable).orderBy(readersTable.name);
+
+    const counts = await db
+      .select({
+        readerId: calendarTable.readerId,
+        count: sql<number>`count(*)`.as("count"),
+      })
+      .from(calendarTable)
+      .where(and(eq(calendarTable.isVacant, false), isNotNull(calendarTable.readerId)))
+      .groupBy(calendarTable.readerId);
+
+    const countMap = new Map<number, number>();
+    for (const row of counts) {
+      if (row.readerId) countMap.set(row.readerId, Number(row.count));
+    }
+
+    // Last role per reader
+    const lastRoleRows = await db
+      .select({
+        readerId: calendarTable.readerId,
+        role: calendarTable.role,
+        date: calendarTable.date,
+      })
+      .from(calendarTable)
+      .where(and(eq(calendarTable.isVacant, false), isNotNull(calendarTable.readerId)))
+      .orderBy(desc(calendarTable.date));
+
+    const lastRoleMap = new Map<number, { role: string; date: string }>();
+    for (const row of lastRoleRows) {
+      if (!row.readerId) continue;
+      if (!lastRoleMap.has(row.readerId)) {
+        lastRoleMap.set(row.readerId, { role: parseRoleName(row.role), date: row.date });
+      }
+    }
+
+    const totalAssignments = allReaders.reduce((sum, r) => sum + (countMap.get(r.id) ?? 0), 0);
+    const avgAssignments = allReaders.length > 0 ? totalAssignments / allReaders.length : 0;
+
+    const stats = allReaders.map((r) => {
+      const total = countMap.get(r.id) ?? 0;
+      const lastInfo = lastRoleMap.get(r.id);
+      return {
+        readerId: r.id,
+        readerName: r.name,
+        totalAssignments: total,
+        lastRole: lastInfo?.role ?? null,
+        lastAssignedDate: lastInfo?.date ?? null,
+        debtScore: avgAssignments - total, // positive = owes more readings
+      };
+    });
+
+    // Sort by debt score descending (most in debt first)
+    stats.sort((a, b) => b.debtScore - a.debtScore);
+
+    res.json(stats);
+  } catch (err) {
+    req.log.error({ err }, "Failed to get calendar stats");
+    res.status(500).json({ error: "Error al obtener estadísticas" });
+  }
+});
+
+// POST /calendar/generate
 router.post("/calendar/generate", async (req, res) => {
   try {
     const parsed = generateInputSchema.safeParse(req.body);
@@ -102,9 +180,7 @@ router.post("/calendar/generate", async (req, res) => {
 
     await db
       .delete(calendarTable)
-      .where(
-        and(gte(calendarTable.date, startDate), lte(calendarTable.date, endDate))
-      );
+      .where(and(gte(calendarTable.date, startDate), lte(calendarTable.date, endDate)));
 
     if (assignments.length > 0) {
       await db.insert(calendarTable).values(
@@ -114,6 +190,7 @@ router.post("/calendar/generate", async (req, res) => {
           scheduleId: a.scheduleId,
           readerId: a.readerId,
           isVacant: a.isVacant,
+          isPublished: false, // draft by default
           liturgicalSeason: a.liturgicalSeason,
         }))
       );
@@ -127,6 +204,23 @@ router.post("/calendar/generate", async (req, res) => {
   }
 });
 
+// POST /calendar/publish — mark all entries as published
+router.post("/calendar/publish", async (req, res) => {
+  try {
+    const now = new Date();
+    const result = await db
+      .update(calendarTable)
+      .set({ isPublished: true, versionTimestamp: now })
+      .returning({ id: calendarTable.id });
+
+    res.json({ published: result.length, publishedAt: now.toISOString() });
+  } catch (err) {
+    req.log.error({ err }, "Failed to publish calendar");
+    res.status(500).json({ error: "Error al publicar el calendario" });
+  }
+});
+
+// POST /calendar/swap
 router.post("/calendar/swap", async (req, res) => {
   try {
     const parsed = swapSchema.safeParse(req.body);
@@ -152,7 +246,6 @@ router.post("/calendar/swap", async (req, res) => {
       return;
     }
 
-    // Validate: reader A is available on entry B's date (if reader A exists)
     if (entryA.readerId && entryB.date) {
       const conflictA = await db
         .select()
@@ -172,7 +265,6 @@ router.post("/calendar/swap", async (req, res) => {
       }
     }
 
-    // Validate: reader B is available on entry A's date
     if (entryB.readerId && entryA.date) {
       const conflictB = await db
         .select()
@@ -192,7 +284,6 @@ router.post("/calendar/swap", async (req, res) => {
       }
     }
 
-    // Swap reader IDs
     await db
       .update(calendarTable)
       .set({ readerId: entryB.readerId, isVacant: entryB.readerId === null, versionTimestamp: new Date() })
@@ -202,16 +293,18 @@ router.post("/calendar/swap", async (req, res) => {
       .set({ readerId: entryA.readerId, isVacant: entryA.readerId === null, versionTimestamp: new Date() })
       .where(eq(calendarTable.id, entryIdB));
 
-    const [updatedA] = await getEntriesWithJoins({ startDate: entryA.date, endDate: entryA.date });
-    const [updatedB] = await getEntriesWithJoins({ startDate: entryB.date, endDate: entryB.date });
-
-    res.json([updatedA, updatedB].filter(Boolean));
+    const rows = await getEntriesWithJoins({
+      startDate: entryA.date < entryB.date ? entryA.date : entryB.date,
+      endDate: entryA.date > entryB.date ? entryA.date : entryB.date,
+    });
+    res.json(rows.filter((r) => r.id === entryIdA || r.id === entryIdB));
   } catch (err) {
     req.log.error({ err }, "Failed to swap calendar entries");
     res.status(500).json({ error: "Error al intercambiar asignaciones" });
   }
 });
 
+// PUT /calendar/:id
 router.put("/calendar/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -226,7 +319,6 @@ router.put("/calendar/:id", async (req, res) => {
       return;
     }
 
-    // Validate unavailability if reassigning reader
     if (parsed.data.readerId) {
       const [entry] = await db
         .select()
@@ -284,6 +376,7 @@ router.put("/calendar/:id", async (req, res) => {
         readerName: readersTable.name,
         logisticComment: calendarTable.logisticComment,
         isVacant: calendarTable.isVacant,
+        isPublished: calendarTable.isPublished,
         liturgicalSeason: calendarTable.liturgicalSeason,
         versionTimestamp: calendarTable.versionTimestamp,
       })
@@ -300,6 +393,7 @@ router.put("/calendar/:id", async (req, res) => {
   }
 });
 
+// DELETE /calendar/:id
 router.delete("/calendar/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
