@@ -641,43 +641,42 @@ function CalendarTab() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <div>
-            <h2 className="text-2xl font-serif">Calendario Asignado</h2>
-            {generatedAt && (
-              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                <Clock className="w-3 h-3" /> Generado el: <span className="font-semibold">{generatedAt}</span>
-              </p>
+          <h2 className="text-2xl font-serif">Calendario Asignado</h2>
+          {generatedAt && (
+            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+              <Clock className="w-3 h-3" /> Generado el: <span className="font-semibold">{generatedAt}</span>
+            </p>
+          )}
+          <div className="flex gap-2 mt-2 flex-wrap">
+            {publishedCount > 0 && (
+              <span className="text-xs bg-green-100 text-green-800 border border-green-200 rounded-full px-2.5 py-0.5 flex items-center gap-1 font-medium">
+                <CheckCircle2 className="w-3 h-3" /> {publishedCount} publicadas
+              </span>
             )}
-            <div className="flex gap-2 mt-2 flex-wrap">
-              {publishedCount > 0 && (
-                <span className="text-xs bg-green-100 text-green-800 border border-green-200 rounded-full px-2.5 py-0.5 flex items-center gap-1 font-medium">
-                  <CheckCircle2 className="w-3 h-3" /> {publishedCount} publicadas
-                </span>
-              )}
-              {hasUnpublished && (
-                <span className="text-xs bg-amber-100 text-amber-800 border border-amber-200 rounded-full px-2.5 py-0.5 flex items-center gap-1 font-medium">
-                  <AlertCircle className="w-3 h-3" /> {draftCount} en borrador
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="flex gap-2 flex-wrap items-center">
-            <div className="flex rounded-xl border border-border overflow-hidden">
-              {VIEW_OPTIONS.map(opt => (
-                <button key={opt.key} onClick={() => setViewMode(opt.key)} className={cn("px-3 py-2 text-xs flex items-center gap-1 transition-colors", viewMode === opt.key ? "bg-primary text-white" : "bg-white text-muted-foreground hover:bg-muted")}>
-                  {opt.icon} {opt.label}
-                </button>
-              ))}
-            </div>
             {hasUnpublished && (
-              <Button onClick={() => setShowPublishConfirm(true)} size="sm" className="gap-1.5 bg-green-700 text-white border-green-800 hover:bg-green-800" disabled={publish.isPending}>
-                <Globe className="w-4 h-4" /> Publicar
-              </Button>
+              <span className="text-xs bg-amber-100 text-amber-800 border border-amber-200 rounded-full px-2.5 py-0.5 flex items-center gap-1 font-medium">
+                <AlertCircle className="w-3 h-3" /> {draftCount} en borrador
+              </span>
             )}
-            <Button onClick={generateWhatsApp} variant="outline" size="sm" className="gap-1.5 bg-green-50 text-green-700 border-green-200 hover:bg-green-100">
-              <MessageCircle className="w-4 h-4" /> WhatsApp
-            </Button>
           </div>
+        </div>
+        <div className="flex gap-2 flex-wrap items-center">
+          <div className="flex rounded-xl border border-border overflow-hidden">
+            {VIEW_OPTIONS.map(opt => (
+              <button key={opt.key} onClick={() => setViewMode(opt.key)} className={cn("px-3 py-2 text-xs flex items-center gap-1 transition-colors", viewMode === opt.key ? "bg-primary text-white" : "bg-white text-muted-foreground hover:bg-muted")}>
+                {opt.icon} {opt.label}
+              </button>
+            ))}
+          </div>
+          {hasUnpublished && (
+            <Button onClick={() => setShowPublishConfirm(true)} size="sm" className="gap-1.5 bg-green-700 text-white border-green-800 hover:bg-green-800" disabled={publish.isPending}>
+              <Globe className="w-4 h-4" /> Publicar
+            </Button>
+          )}
+          <Button onClick={generateWhatsApp} variant="outline" size="sm" className="gap-1.5 bg-green-50 text-green-700 border-green-200 hover:bg-green-100">
+            <MessageCircle className="w-4 h-4" /> WhatsApp
+          </Button>
+        </div>
       </div>
 
       {viewMode === "cuadricula" && <WeekGridView entries={calendar} schedules={schedules} onEditEntry={setEditingEntry} />}
@@ -732,6 +731,39 @@ function CalendarTab() {
         onSwap={handleSwap}
         isLoading={updateEntry.isPending || swap.isPending}
       />
+
+      {/* Publish confirmation dialog */}
+      <Dialog isOpen={showPublishConfirm} onClose={() => setShowPublishConfirm(false)} title="Publicar Calendario">
+        <div className="space-y-5">
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-sm text-green-900">
+            <p className="font-semibold flex items-center gap-2 mb-2">
+              <Globe className="w-5 h-5" /> ¿Publicar el calendario ahora?
+            </p>
+            <p>
+              <strong>{draftCount}</strong> asignaciones en borrador serán visibles para todos los lectores en su portal. Esta acción no se puede deshacer fácilmente.
+            </p>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Los lectores verán sus próximas funciones y el calendario grupal una vez publicado.
+          </p>
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" className="flex-1" onClick={() => setShowPublishConfirm(false)}>
+              Cancelar
+            </Button>
+            <Button
+              className="flex-1 bg-green-700 hover:bg-green-800"
+              disabled={publish.isPending}
+              onClick={() => {
+                publish.mutate();
+                setShowPublishConfirm(false);
+              }}
+            >
+              <SendHorizonal className="w-4 h-4 mr-2" />
+              {publish.isPending ? "Publicando..." : "Confirmar y Publicar"}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }
@@ -955,23 +987,145 @@ function ReadersTab() {
   );
 }
 
+// ─── DashboardTab ─────────────────────────────────────────────────────────────
+
+function DashboardTab() {
+  const { data: stats = [], isLoading } = useCalendarStats();
+  const { data: calendar = [] } = useCalendar();
+
+  const totalAssigned = (stats as any[]).reduce((s: number, r: any) => s + r.totalAssignments, 0);
+  const totalReaders = (stats as any[]).length;
+  const avg = totalReaders > 0 ? (totalAssigned / totalReaders).toFixed(1) : "0";
+  const vacantCount = calendar.filter((e: any) => e.isVacant).length;
+  const publishedCount = calendar.filter((e: any) => e.isPublished).length;
+  const draftCount = calendar.filter((e: any) => !e.isPublished).length;
+
+  if (isLoading) {
+    return <div className="py-12 flex justify-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>;
+  }
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-2xl font-serif text-primary flex items-center gap-2">
+          <BarChart3 className="w-6 h-6 text-accent" /> Dashboard
+        </h2>
+        <p className="text-muted-foreground mt-1 text-sm">Resumen de participación y estado del calendario.</p>
+      </div>
+
+      {/* Stats cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {[
+          { label: "Lectores activos", value: totalReaders, icon: <UserCircle className="w-5 h-5" />, color: "text-primary" },
+          { label: "Promedio lecturas", value: avg, icon: <BarChart3 className="w-5 h-5" />, color: "text-accent" },
+          { label: "Vacantes", value: vacantCount, icon: <AlertCircle className="w-5 h-5" />, color: vacantCount > 0 ? "text-destructive" : "text-green-600" },
+          { label: "Publicadas", value: publishedCount, icon: <Globe className="w-5 h-5" />, color: "text-green-700" },
+        ].map(stat => (
+          <Card key={stat.label} className="p-5 text-center">
+            <div className={cn("flex justify-center mb-2", stat.color)}>{stat.icon}</div>
+            <div className={cn("text-3xl font-bold font-serif mb-1", stat.color)}>{stat.value}</div>
+            <div className="text-xs text-muted-foreground">{stat.label}</div>
+          </Card>
+        ))}
+      </div>
+
+      {/* Draft status */}
+      {draftCount > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold text-amber-900">{draftCount} asignaciones en borrador</p>
+            <p className="text-sm text-amber-800 mt-0.5">Los lectores aún no pueden verlas. Ve a "Calendario" y pulsa <strong>Publicar</strong> cuando estén listas.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Reader equity table */}
+      <Card className="overflow-hidden border border-primary/20">
+        <div className="px-6 py-4 border-b border-primary/15 bg-secondary/50 flex items-center justify-between">
+          <h3 className="font-serif text-lg text-primary">Equidad de Participación</h3>
+          <span className="text-xs text-muted-foreground">Ordenado por deuda de lectura</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="border-b border-border">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold text-primary text-xs">Lector</th>
+                <th className="px-4 py-3 text-center font-semibold text-primary text-xs">Lecturas totales</th>
+                <th className="px-4 py-3 text-center font-semibold text-primary text-xs">Último rol</th>
+                <th className="px-4 py-3 text-center font-semibold text-primary text-xs">Última fecha</th>
+                <th className="px-4 py-3 text-center font-semibold text-primary text-xs">Estado</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {(stats as any[]).map((stat: any) => {
+                const debt = stat.debtScore;
+                const isInDebt = debt > 1;
+                const isAhead = debt < -1;
+                return (
+                  <tr key={stat.readerId} className="hover:bg-muted/20 transition-colors">
+                    <td className="px-4 py-3 font-medium font-serif">{stat.readerName}</td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="font-bold text-primary">{stat.totalAssignments}</span>
+                    </td>
+                    <td className="px-4 py-3 text-center text-muted-foreground text-xs">{stat.lastRole ?? "—"}</td>
+                    <td className="px-4 py-3 text-center text-muted-foreground text-xs">
+                      {stat.lastAssignedDate ? formatDate(stat.lastAssignedDate) : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {isInDebt ? (
+                        <span className="inline-flex items-center gap-1 text-xs bg-red-100 text-red-700 border border-red-200 rounded-full px-2 py-0.5 font-medium">
+                          <TrendingDown className="w-3 h-3" /> En deuda
+                        </span>
+                      ) : isAhead ? (
+                        <span className="inline-flex items-center gap-1 text-xs bg-blue-100 text-blue-700 border border-blue-200 rounded-full px-2 py-0.5 font-medium">
+                          <TrendingUp className="w-3 h-3" /> Adelantado
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs bg-green-100 text-green-700 border border-green-200 rounded-full px-2 py-0.5 font-medium">
+                          <Minus className="w-3 h-3" /> Equilibrado
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+              {(stats as any[]).length === 0 && (
+                <tr><td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">No hay datos todavía. Registra lectores y genera el calendario.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ─── Dummy UserCircle import fix ───
+const UserCircle = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+  </svg>
+);
+
 // ─── Admin Page ───────────────────────────────────────────────────────────────
 
 const TABS = [
-  { key: "readers",  label: "Lectores" },
-  { key: "calendar", label: "Calendario" },
-  { key: "generate", label: "Generar" },
-  { key: "config",   label: "Configuración" },
+  { key: "dashboard", label: "Dashboard" },
+  { key: "readers",   label: "Lectores" },
+  { key: "calendar",  label: "Calendario" },
+  { key: "generate",  label: "Generar" },
+  { key: "config",    label: "Configuración" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<TabKey>("readers");
+  const [activeTab, setActiveTab] = useState<TabKey>("dashboard");
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-wrap gap-2 p-1.5 bg-muted/50 rounded-2xl w-full border border-border">
+      <div className="flex flex-wrap gap-1.5 p-1.5 bg-muted/50 rounded-2xl w-full border border-border">
         {TABS.map(tab => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={cn("px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-300 relative flex-1", activeTab === tab.key ? "text-primary" : "text-muted-foreground hover:text-foreground hover:bg-black/5")}>
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={cn("px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-300 relative flex-1", activeTab === tab.key ? "text-primary" : "text-muted-foreground hover:text-foreground hover:bg-black/5")}>
             {activeTab === tab.key && <motion.div layoutId="activeTab" className="absolute inset-0 bg-white rounded-xl shadow-sm border border-border" style={{ zIndex: -1 }} />}
             <span className="relative z-10">{tab.label}</span>
           </button>
@@ -980,6 +1134,7 @@ export default function AdminPage() {
       <div className="min-h-[400px]">
         <AnimatePresence mode="wait">
           <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
+            {activeTab === "dashboard" && <DashboardTab />}
             {activeTab === "readers" && <ReadersTab />}
             {activeTab === "calendar" && <CalendarTab />}
             {activeTab === "generate" && <GenerateTab />}
