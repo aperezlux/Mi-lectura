@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Link, useLocation, useRouter } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Calendar, Users, Lock, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/auth";
@@ -162,8 +162,7 @@ function AdminPasswordModal({
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation();
-  const router = useRouter();
+  const [location, navigate] = useLocation();
   const { isAdmin } = useAuth();
   const [showModal, setShowModal] = useState(false);
 
@@ -183,7 +182,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   function handleModalSuccess() {
     setShowModal(false);
-    router.navigate("/");
+    navigate("/");
   }
 
   return (
