@@ -118,7 +118,8 @@ function getGeneratedAt(entries: CalendarEntry[]): string | null {
 // ─── Week Grid View (5-column reference layout) ─────────────────────────────
 
 const GRID_COLUMNS = [
-  { key: "thursday",    label: "Jueves",    abbr: "Jue" },
+  { key: "thursday_am", label: "Jue A.M.",  abbr: "JueAM" },
+  { key: "thursday_pm", label: "Jue P.M.",  abbr: "JuePM" },
   { key: "saturday_am", label: "Sáb A.M.",  abbr: "SáAM" },
   { key: "saturday_pm", label: "Sáb P.M.",  abbr: "SáPM" },
   { key: "sunday_am",   label: "Dom A.M.",  abbr: "DoAM" },
@@ -138,12 +139,28 @@ const GRID_ROLES = [
 
 // Which roles apply to each day type
 const ROLES_FOR_COL: Record<string, Set<string>> = {
-  thursday:    new Set(["1ª Lectura", "Salmo", "Oraciones"]),
+  thursday_am: new Set(["1ª Lectura", "Salmo"]),
+  thursday_pm: new Set(["1ª Lectura", "Salmo", "Oraciones"]),
   saturday_am: new Set(["Monitor", "1ª Lectura", "Salmo", "2ª Lectura", "Oraciones"]),
   saturday_pm: new Set(["Monitor", "1ª Lectura", "Salmo", "2ª Lectura", "Oraciones"]),
   sunday_am:   new Set(["Bienvenida 1", "Bienvenida 2", "Monitor", "1ª Lectura", "Salmo", "2ª Lectura", "Oraciones"]),
   sunday_pm:   new Set(["Monitor", "1ª Lectura", "Salmo", "2ª Lectura", "Oraciones"]),
 };
+
+// ─── Period helpers ──────────────────────────────────────────────────────────
+
+const PERIOD_STORAGE_KEY = "liturgia_generated_period";
+
+function computeEndDate(startDate: string, period: "15days" | "1month"): string {
+  const d = new Date(startDate + "T12:00:00");
+  if (period === "15days") {
+    d.setDate(d.getDate() + 13);
+  } else {
+    d.setMonth(d.getMonth() + 1);
+    d.setDate(0);
+  }
+  return d.toISOString().split("T")[0];
+}
 
 function getWeekMonday(dateStr: string): string {
   const d = new Date(dateStr + "T12:00:00");
@@ -382,27 +399,63 @@ function MonthlyCalendar({ entries, onEditEntry }: MonthlyCalendarProps) {
               bySchedule.get(key)!.push(e);
             }
 
+            // Liturgical dot colors by day type
+            const massCount = dayEntries.length;
+
             return (
               <button
                 key={dateStr}
                 onClick={() => setSelectedDate(isSelected ? null : dateStr)}
-                className={cn("min-h-[80px] border-b border-r border-border/30 p-1.5 text-left transition-all hover:brightness-95", !isSameMonth(day, monthDate) && "opacity-50", isSelected && "ring-2 ring-inset ring-primary")}
+                className={cn(
+                  "min-h-[72px] border-b border-r border-border/30 p-1.5 text-left transition-all hover:brightness-95 flex flex-col",
+                  !isSameMonth(day, monthDate) && "opacity-30",
+                  isSelected && "ring-2 ring-inset ring-primary"
+                )}
                 style={{ background: colors ? colors.bg : undefined }}
               >
-                <div className="flex justify-between items-start mb-1">
-                  <span className={cn("text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full", isSelected ? "bg-primary text-white" : "text-foreground")}>
+                {/* Day number + vacant badge */}
+                <div className="flex justify-between items-center mb-1">
+                  <span className={cn(
+                    "text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full",
+                    isSelected ? "bg-primary text-white" : "text-foreground"
+                  )}>
                     {format(day, "d")}
                   </span>
-                  {vacantCount > 0 && <span className="text-[10px] bg-red-100 text-red-700 rounded-full px-1 font-bold">!{vacantCount}</span>}
+                  {vacantCount > 0 && (
+                    <span className="text-[9px] bg-red-500 text-white rounded-full px-1 font-bold">!{vacantCount}</span>
+                  )}
                 </div>
-                {Array.from(bySchedule.entries()).slice(0, 2).map(([schedName, es]) => (
-                  <div key={schedName} className="text-[10px] leading-tight mb-0.5">
-                    <span className="text-muted-foreground font-medium">{schedName.split(" ").slice(-2).join(" ")}: </span>
-                    {es.slice(0, 2).map(e => e.isVacant ? <span key={e.id} className="text-red-500">✗ </span> : <span key={e.id}>{e.readerName?.split(" ")[0]} </span>)}
-                    {es.length > 2 && <span className="text-muted-foreground">+{es.length - 2}</span>}
+
+                {/* Liturgical dots */}
+                {massCount > 0 && (
+                  <div className="flex flex-wrap gap-[3px] mt-auto">
+                    {Array.from(bySchedule.entries()).map(([schedName, grpEntries]) => {
+                      const hasVacant = grpEntries.some(e => e.isVacant);
+                      const dotColor = hasVacant
+                        ? "bg-red-500"
+                        : colors
+                        ? colors.badge.includes("green") ? "bg-green-500"
+                          : colors.badge.includes("purple") ? "bg-purple-500"
+                          : colors.badge.includes("amber") ? "bg-amber-500"
+                          : colors.badge.includes("blue") ? "bg-blue-400"
+                          : colors.badge.includes("red") ? "bg-red-600"
+                          : "bg-primary"
+                        : "bg-primary/60";
+                      return (
+                        <span
+                          key={schedName}
+                          title={schedName}
+                          className={cn("w-2 h-2 rounded-full shrink-0", dotColor)}
+                        />
+                      );
+                    })}
                   </div>
-                ))}
-                {bySchedule.size > 2 && <div className="text-[10px] text-muted-foreground">+{bySchedule.size - 2} misas</div>}
+                )}
+                {massCount > 0 && (
+                  <span className="text-[9px] text-muted-foreground mt-0.5">
+                    {massCount} {massCount === 1 ? "lector" : "lectores"}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -581,6 +634,20 @@ function CalendarTab() {
   const [editingEntry, setEditingEntry] = useState<CalendarEntry | null>(null);
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
 
+  // Period filter — read from localStorage (set by GenerateTab on success)
+  const [periodFilter, setPeriodFilter] = useState<{ start: string; end: string } | null>(() => {
+    try {
+      const stored = localStorage.getItem(PERIOD_STORAGE_KEY);
+      return stored ? JSON.parse(stored) : null;
+    } catch { return null; }
+  });
+
+  // Apply period filter to all views
+  const filteredCalendar = useMemo(() => {
+    if (!periodFilter) return calendar;
+    return calendar.filter(e => e.date >= periodFilter.start && e.date <= periodFilter.end);
+  }, [calendar, periodFilter]);
+
   const sameDayEntries = useMemo(() => {
     if (!editingEntry) return [];
     return calendar.filter(e => e.date === editingEntry.date);
@@ -603,11 +670,12 @@ function CalendarTab() {
     let msg = `🙏 *CALENDARIO LITÚRGICO DE LECTORES*\n`;
     msg += `*Parroquia Santo Cristo de Esquipulas*\n`;
     if (generatedAt) msg += `_Generado el: ${generatedAt}_\n`;
+    if (periodFilter) msg += `_Período: ${formatDate(periodFilter.start)} – ${formatDate(periodFilter.end)}_\n`;
     msg += `\n`;
 
     let curDate = "";
     let curSched = "";
-    const sorted = [...calendar].sort((a, b) => a.date.localeCompare(b.date) || a.role.localeCompare(b.role));
+    const sorted = [...filteredCalendar].sort((a, b) => a.date.localeCompare(b.date) || a.role.localeCompare(b.role));
 
     sorted.forEach(c => {
       const schedPart = parseSchedulePart(c.role);
@@ -679,47 +747,123 @@ function CalendarTab() {
         </div>
       </div>
 
-      {viewMode === "cuadricula" && <WeekGridView entries={calendar} schedules={schedules} onEditEntry={setEditingEntry} />}
-      {viewMode === "mensual" && <MonthlyCalendar entries={calendar} onEditEntry={setEditingEntry} />}
-      {viewMode === "tabla" && (
-        <Card className="overflow-x-auto border border-primary/20 shadow-sm">
-          <table className="w-full text-sm text-left">
-            <thead className="border-b-2 border-primary/25">
-              <tr>
-                {["Fecha", "Temporada", "Misa", "Rol", "Lector Asignado", "Comentario", ""].map(h => (
-                  <th key={h} className="px-4 py-3 font-semibold text-primary text-sm bg-secondary/70 whitespace-nowrap" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {calendar.map(entry => {
-                const season = getLiturgicalSeason(entry.date);
-                const conflict = entry.readerId ? checkProximityConflict(calendar, entry.readerId, entry.date) : false;
-                const colors = SEASON_COLORS[entry.liturgicalSeason ?? season.name];
-                return (
-                  <tr key={entry.id} className="hover:brightness-95 transition-colors" style={{ background: colors?.bg }}>
-                    <td className="px-4 py-3 font-medium whitespace-nowrap">{formatDate(entry.date)}</td>
-                    <td className="px-4 py-3"><Badge className={colors?.badge ?? ""}>{entry.liturgicalSeason ?? season.name}</Badge></td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground max-w-[140px] truncate">{parseSchedulePart(entry.role)}</td>
-                    <td className="px-4 py-3 font-medium">{parseRolePart(entry.role)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        {entry.isVacant ? <Badge variant="destructive" className="text-xs font-bold uppercase tracking-widest">🚨 VACANTE</Badge> : <span className="font-medium" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{entry.readerName}</span>}
-                        {!entry.isVacant && conflict && <AlertCircle className="w-4 h-4 text-amber-500" title="Asignado en misa contigua" />}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground italic">{entry.logisticComment || "—"}</td>
-                    <td className="px-4 py-3">
-                      <Button size="sm" variant="ghost" onClick={() => setEditingEntry(entry)} className="text-xs gap-1"><Edit2 className="w-3 h-3" /> Editar</Button>
-                    </td>
-                  </tr>
-                );
-              })}
-              {calendar.length === 0 && <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">No hay asignaciones. Usa "Generar" para crear el calendario.</td></tr>}
-            </tbody>
-          </table>
-        </Card>
+      {/* Period filter banner */}
+      {periodFilter && (
+        <div className="flex items-center gap-3 bg-primary/5 border border-primary/20 rounded-xl px-4 py-2.5 text-sm">
+          <CalIcon className="w-4 h-4 text-primary shrink-0" />
+          <span className="text-primary font-medium">
+            Período generado:&nbsp;
+            <span className="font-serif">{formatDate(periodFilter.start)}</span>
+            &nbsp;→&nbsp;
+            <span className="font-serif">{formatDate(periodFilter.end)}</span>
+          </span>
+          <span className="ml-auto text-xs text-muted-foreground">{filteredCalendar.length} asignaciones</span>
+          <button
+            onClick={() => { localStorage.removeItem(PERIOD_STORAGE_KEY); setPeriodFilter(null); }}
+            className="text-muted-foreground hover:text-destructive transition-colors text-xs underline"
+          >
+            Quitar filtro
+          </button>
+        </div>
       )}
+
+      {viewMode === "cuadricula" && <WeekGridView entries={filteredCalendar} schedules={schedules} onEditEntry={setEditingEntry} />}
+      {viewMode === "mensual" && <MonthlyCalendar entries={filteredCalendar} onEditEntry={setEditingEntry} />}
+      {viewMode === "tabla" && (() => {
+        // Group filtered entries by date for clean presentation
+        const byDate = new Map<string, CalendarEntry[]>();
+        const sorted = [...filteredCalendar].sort((a, b) => a.date.localeCompare(b.date) || a.role.localeCompare(b.role));
+        for (const e of sorted) {
+          if (!byDate.has(e.date)) byDate.set(e.date, []);
+          byDate.get(e.date)!.push(e);
+        }
+        const dateGroups = Array.from(byDate.entries());
+
+        return (
+          <div className="space-y-3">
+            {dateGroups.length === 0 && (
+              <div className="py-12 text-center text-muted-foreground border-2 border-dashed border-border rounded-2xl">
+                No hay asignaciones. Usa "Generar" para crear el calendario.
+              </div>
+            )}
+            {dateGroups.map(([date, entries]) => {
+              const season = getLiturgicalSeason(date);
+              const colors = SEASON_COLORS[entries[0]?.liturgicalSeason ?? season.name];
+              const vacantHere = entries.some(e => e.isVacant);
+
+              // Group within date by schedule (mass time)
+              const bySchedule = new Map<string, CalendarEntry[]>();
+              for (const e of entries) {
+                const key = parseSchedulePart(e.role);
+                if (!bySchedule.has(key)) bySchedule.set(key, []);
+                bySchedule.get(key)!.push(e);
+              }
+
+              return (
+                <Card key={date} className="overflow-hidden border border-primary/15 shadow-sm">
+                  {/* Date header */}
+                  <div
+                    className="px-5 py-3 flex items-center gap-3 border-b border-primary/10"
+                    style={{ background: colors?.bg ?? "rgba(120,40,60,0.04)" }}
+                  >
+                    <div>
+                      <span className="font-serif font-bold text-primary text-base">
+                        {format(new Date(date + "T12:00:00"), "EEEE d 'de' MMMM", { locale: es })}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 ml-auto">
+                      {colors && (
+                        <Badge className={cn("text-[10px]", colors.badge)}>
+                          {entries[0]?.liturgicalSeason ?? season.name}
+                        </Badge>
+                      )}
+                      {vacantHere && <Badge variant="destructive" className="text-[10px]">🚨 Vacante</Badge>}
+                    </div>
+                  </div>
+
+                  {/* Masses within this date */}
+                  {Array.from(bySchedule.entries()).map(([schedName, massEntries], idx) => (
+                    <div key={schedName} className={cn("px-5 py-3", idx > 0 && "border-t border-border/40")}>
+                      <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1 mb-2">
+                        <Clock className="w-3 h-3" /> {schedName}
+                      </p>
+                      <div className="space-y-1.5">
+                        {massEntries.map(entry => {
+                          const conflict = entry.readerId ? checkProximityConflict(filteredCalendar, entry.readerId, entry.date) : false;
+                          return (
+                            <div key={entry.id} className="flex items-center gap-3 group">
+                              <span className="w-28 text-xs text-muted-foreground shrink-0">{parseRolePart(entry.role)}</span>
+                              <div className="flex-1 flex items-center gap-2">
+                                {entry.isVacant
+                                  ? <Badge variant="destructive" className="text-xs">🚨 VACANTE</Badge>
+                                  : <span className="font-medium font-serif text-sm">{entry.readerName}</span>
+                                }
+                                {!entry.isVacant && conflict && (
+                                  <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" title="Misa contigua" />
+                                )}
+                                {entry.logisticComment && (
+                                  <span className="text-xs text-amber-700 italic">({entry.logisticComment})</span>
+                                )}
+                              </div>
+                              <Button
+                                size="sm" variant="ghost"
+                                onClick={() => setEditingEntry(entry)}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity text-xs gap-1 h-7 px-2"
+                              >
+                                <Edit2 className="w-3 h-3" /> Editar
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </Card>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       <EditModal
         entry={editingEntry}
@@ -781,6 +925,9 @@ function GenerateTab() {
   const handleGenerate = (e: React.FormEvent) => {
     e.preventDefault();
     if (window.confirm("Se borrarán y regenerarán las asignaciones del período indicado. ¿Continuar?")) {
+      const endDate = computeEndDate(formData.startDate, formData.period);
+      // Save period to localStorage so CalendarTab can filter all 3 views consistently
+      localStorage.setItem(PERIOD_STORAGE_KEY, JSON.stringify({ start: formData.startDate, end: endDate }));
       generate.mutate({ data: { startDate: formData.startDate, period: formData.period } });
     }
   };
