@@ -98,6 +98,7 @@ export const GetUnavailabilityResponseItem = zod.object({
   readerId: zod.number(),
   blockedDate: zod.coerce.date(),
   readerName: zod.string().optional(),
+  shift: zod.enum(["morning", "evening", "all"]),
 });
 export const GetUnavailabilityResponse = zod.array(
   GetUnavailabilityResponseItem,
@@ -109,6 +110,7 @@ export const GetUnavailabilityResponse = zod.array(
 export const CreateUnavailabilityBody = zod.object({
   readerId: zod.number(),
   blockedDate: zod.coerce.date(),
+  shift: zod.enum(["morning", "evening", "all"]).optional(),
 });
 
 /**
@@ -126,7 +128,8 @@ export const GetSchedulesResponseItem = zod.object({
   name: zod.string(),
   dayType: zod.enum([
     "weekday",
-    "thursday",
+    "thursday_am",
+    "thursday_pm",
     "saturday_am",
     "saturday_pm",
     "sunday_am",
@@ -161,7 +164,8 @@ export const UpdateScheduleResponse = zod.object({
   name: zod.string(),
   dayType: zod.enum([
     "weekday",
-    "thursday",
+    "thursday_am",
+    "thursday_pm",
     "saturday_am",
     "saturday_pm",
     "sunday_am",

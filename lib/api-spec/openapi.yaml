@@ -461,6 +461,10 @@ components:
           type: string
           enum: [Principiante, Experto]
 
+    UnavailabilityShift:
+      type: string
+      enum: [morning, evening, all]
+
     Unavailability:
       type: object
       properties:
@@ -473,10 +477,13 @@ components:
           format: date
         readerName:
           type: string
+        shift:
+          $ref: "#/components/schemas/UnavailabilityShift"
       required:
         - id
         - readerId
         - blockedDate
+        - shift
 
     CreateUnavailabilityInput:
       type: object
@@ -486,6 +493,8 @@ components:
         blockedDate:
           type: string
           format: date
+        shift:
+          $ref: "#/components/schemas/UnavailabilityShift"
       required:
         - readerId
         - blockedDate
@@ -499,7 +508,7 @@ components:
           type: string
         dayType:
           type: string
-          enum: [weekday, thursday, saturday_am, saturday_pm, sunday_am, sunday_pm]
+          enum: [weekday, thursday_am, thursday_pm, saturday_am, saturday_pm, sunday_am, sunday_pm]
         time:
           type: string
         isActive:

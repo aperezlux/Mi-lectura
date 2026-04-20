@@ -10,8 +10,10 @@ import { cn, formatDate } from "@/lib/utils";
 import {
   Calendar as CalendarIcon, UserCircle, AlertCircle,
   ChevronLeft, ChevronRight, CheckCircle, Clock,
-  BookOpen, Star, CalendarDays
+  BookOpen, Star, CalendarDays, Sun, Moon, X
 } from "lucide-react";
+
+type Shift = "morning" | "evening" | "all";
 
 function parseRolePart(roleStr: string): string {
   return roleStr.split(" - ")[0];
@@ -21,20 +23,100 @@ function parseSchedulePart(roleStr: string): string {
   return parts.slice(1).join(" - ");
 }
 
+// Days that need shift selection (Thursday=4, Saturday=6, Sunday=0)
+function needsShiftPicker(date: Date): boolean {
+  const dow = getDay(date);
+  return dow === 0 || dow === 4 || dow === 6;
+}
+
+// ─── Shift Picker Overlay ────────────────────────────────────────────────────
+
+function ShiftPicker({
+  dateLabel,
+  onSelect,
+  onCancel,
+}: {
+  dateLabel: string;
+  onSelect: (shift: Shift) => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center" onClick={onCancel}>
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <motion.div
+        initial={{ y: 40, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 40, opacity: 0 }}
+        className="relative z-10 bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-sm mx-0 sm:mx-4 p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-serif text-lg text-primary">¿Cuándo no podrás ir?</h3>
+          <button onClick={onCancel} className="p-1 rounded-lg hover:bg-muted transition-colors">
+            <X className="w-4 h-4 text-muted-foreground" />
+          </button>
+        </div>
+        <p className="text-sm text-muted-foreground mb-5 capitalize">{dateLabel}</p>
+
+        <div className="space-y-3">
+          <button
+            onClick={() => onSelect("morning")}
+            className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-amber-200 bg-amber-50 hover:bg-amber-100 hover:border-amber-400 active:scale-[0.98] transition-all text-left"
+          >
+            <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
+              <Sun className="w-6 h-6 text-amber-600" />
+            </div>
+            <div>
+              <p className="font-semibold text-amber-900">Solo Mañana</p>
+              <p className="text-xs text-amber-700 mt-0.5">No puedo en la misa de mañana, sí en la de la noche</p>
+            </div>
+          </button>
+
+          <button
+            onClick={() => onSelect("evening")}
+            className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-indigo-200 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-400 active:scale-[0.98] transition-all text-left"
+          >
+            <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center shrink-0">
+              <Moon className="w-6 h-6 text-indigo-600" />
+            </div>
+            <div>
+              <p className="font-semibold text-indigo-900">Solo Tarde/Noche</p>
+              <p className="text-xs text-indigo-700 mt-0.5">No puedo en la misa de la tarde, sí en la de mañana</p>
+            </div>
+          </button>
+
+          <button
+            onClick={() => onSelect("all")}
+            className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-400 active:scale-[0.98] transition-all text-left"
+          >
+            <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center shrink-0">
+              <CalendarIcon className="w-6 h-6 text-red-600" />
+            </div>
+            <div>
+              <p className="font-semibold text-red-900">Todo el día</p>
+              <p className="text-xs text-red-700 mt-0.5">No puedo en ninguna misa de este día</p>
+            </div>
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 // ─── Unavailability Calendar (shared) ────────────────────────────────────────
 
 interface UnavailCalendarProps {
   selectedReaderId: number;
-  compact?: boolean;
 }
 
-function UnavailCalendar({ selectedReaderId, compact = false }: UnavailCalendarProps) {
+function UnavailCalendar({ selectedReaderId }: UnavailCalendarProps) {
   const today = new Date();
   const { data: unavailabilities = [], isLoading: loadingUnavail } = useUnavailability(selectedReaderId);
   const { data: calendar = [] } = useCalendar({ publishedOnly: true });
   const { block, unblock } = useUnavailabilityMutations();
 
   const [currentMonth, setCurrentMonth] = useState(startOfMonth(today));
+  const [pickerState, setPickerState] = useState<{ dateStr: string; label: string } | null>(null);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -42,18 +124,46 @@ function UnavailCalendar({ selectedReaderId, compact = false }: UnavailCalendarP
   const firstDow = getDay(monthStart);
   const emptyCells = firstDow === 0 ? 6 : firstDow - 1;
 
-  const toggleDate = (date: Date) => {
-    const dateStr = format(date, "yyyy-MM-dd");
+  const handleDayClick = (day: Date) => {
+    const dateStr = format(day, "yyyy-MM-dd");
     const existing = unavailabilities.find(u => u.blockedDate === dateStr);
+
     if (existing) {
+      // Always unblock on click if already blocked
       unblock.mutate({ id: existing.id });
-    } else {
-      block.mutate({ data: { readerId: selectedReaderId, blockedDate: dateStr } });
+      return;
     }
+
+    if (needsShiftPicker(day)) {
+      // Thu/Sat/Sun: show shift picker
+      setPickerState({
+        dateStr,
+        label: format(day, "EEEE, d 'de' MMMM", { locale: es }),
+      });
+    } else {
+      // Weekday: always full day
+      block.mutate({ data: { readerId: selectedReaderId, blockedDate: dateStr, shift: "all" } });
+    }
+  };
+
+  const handleShiftSelect = (shift: Shift) => {
+    if (!pickerState) return;
+    block.mutate({ data: { readerId: selectedReaderId, blockedDate: pickerState.dateStr, shift } });
+    setPickerState(null);
   };
 
   return (
     <div className="space-y-4">
+      <AnimatePresence>
+        {pickerState && (
+          <ShiftPicker
+            dateLabel={pickerState.label}
+            onSelect={handleShiftSelect}
+            onCancel={() => setPickerState(null)}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Month navigation */}
       <div className="flex justify-between items-center">
         <button
@@ -85,21 +195,36 @@ function UnavailCalendar({ selectedReaderId, compact = false }: UnavailCalendarP
         {Array.from({ length: emptyCells }).map((_, i) => <div key={`p-${i}`} />)}
         {daysInMonth.map(day => {
           const dateStr = format(day, "yyyy-MM-dd");
-          const isBlocked = unavailabilities.some(u => u.blockedDate === dateStr);
+          const unavail = unavailabilities.find(u => u.blockedDate === dateStr);
+          const shift = (unavail?.shift ?? null) as Shift | null;
+          const isBlocked = !!unavail;
+          const isPartial = isBlocked && shift !== "all";
+          const isTotalBlocked = isBlocked && shift === "all";
           const isPast = day < new Date(new Date().setHours(0, 0, 0, 0));
           const isAssigned = calendar.some(c => c.readerId === selectedReaderId && c.date === dateStr);
+          const hasShiftPicker = needsShiftPicker(day);
 
           return (
             <button
               key={dateStr}
               disabled={isPast || loadingUnavail}
-              onClick={() => toggleDate(day)}
-              title={isAssigned ? "Tienes asignación publicada en este día" : undefined}
+              onClick={() => handleDayClick(day)}
+              title={
+                isPartial
+                  ? shift === "morning" ? "Solo Mañana bloqueada — clic para desbloquear" : "Solo Tarde/Noche bloqueada — clic para desbloquear"
+                  : isTotalBlocked ? "Todo el día bloqueado — clic para desbloquear"
+                  : hasShiftPicker ? "Toca para seleccionar el turno"
+                  : "Toca para bloquear este día"
+              }
               className={cn(
-                "aspect-square flex items-center justify-center rounded-lg text-sm font-medium transition-all duration-200 relative",
+                "aspect-square flex flex-col items-center justify-center rounded-lg text-sm font-medium transition-all duration-200 relative",
                 isPast ? "opacity-25 cursor-not-allowed" : "hover:scale-105 active:scale-95 cursor-pointer",
-                isBlocked
+                isTotalBlocked
                   ? "bg-destructive text-white shadow-md shadow-destructive/30"
+                  : isPartial && shift === "morning"
+                  ? "bg-amber-400 text-white shadow-md shadow-amber-400/30"
+                  : isPartial && shift === "evening"
+                  ? "bg-indigo-500 text-white shadow-md shadow-indigo-500/30"
                   : isAssigned
                   ? "bg-primary/20 text-primary border-2 border-primary/40"
                   : isToday(day)
@@ -107,7 +232,12 @@ function UnavailCalendar({ selectedReaderId, compact = false }: UnavailCalendarP
                   : "bg-muted/40 hover:bg-muted text-foreground"
               )}
             >
-              {format(day, "d")}
+              <span className="leading-none">{format(day, "d")}</span>
+              {isPartial && (
+                <span className="text-[8px] leading-none mt-0.5 opacity-90 font-semibold">
+                  {shift === "morning" ? "☀" : "🌙"}
+                </span>
+              )}
               {isAssigned && !isBlocked && (
                 <span className="absolute -top-1 -right-1 w-2 h-2 bg-accent rounded-full" />
               )}
@@ -118,10 +248,31 @@ function UnavailCalendar({ selectedReaderId, compact = false }: UnavailCalendarP
 
       {/* Legend */}
       <div className="flex flex-wrap gap-3 text-xs text-muted-foreground pt-1">
-        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-destructive inline-block" /> No disponible</span>
-        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded border-2 border-primary/40 bg-primary/20 inline-block" /> Asignado</span>
-        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded border-2 border-accent inline-block" /> Hoy</span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded bg-destructive inline-block" />
+          No disponible (todo el día)
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded bg-amber-400 inline-block" />
+          Solo mañana
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded bg-indigo-500 inline-block" />
+          Solo tarde/noche
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded border-2 border-primary/40 bg-primary/20 inline-block" />
+          Asignado
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded border-2 border-accent inline-block" />
+          Hoy
+        </span>
       </div>
+
+      <p className="text-xs text-muted-foreground italic">
+        Jueves, Sábados y Domingos: podrás elegir si bloqueas solo la mañana, solo la tarde o todo el día.
+      </p>
     </div>
   );
 }
@@ -150,7 +301,6 @@ function AssignmentsView({ readerId, readerName, readerLevel }: AssignmentsViewP
 
   const nextAssignment = myUpcoming[0];
 
-  // Group upcoming by date
   const grouped = new Map<string, typeof myUpcoming>();
   for (const e of myUpcoming) {
     if (!grouped.has(e.date)) grouped.set(e.date, []);
@@ -205,7 +355,7 @@ function AssignmentsView({ readerId, readerName, readerLevel }: AssignmentsViewP
             </div>
           </div>
         ) : (
-          <div className="px-6 py-4 text-muted-foreground text-sm text-center py-6">
+          <div className="px-6 py-8 text-muted-foreground text-sm text-center">
             No tienes funciones próximas asignadas en el calendario publicado.
           </div>
         )}
@@ -263,7 +413,6 @@ function AssignmentsView({ readerId, readerName, readerLevel }: AssignmentsViewP
         </div>
       )}
 
-      {/* Past assignments (collapsed) */}
       {myPast.length > 0 && (
         <div className="text-center">
           <p className="text-xs text-muted-foreground">
@@ -309,7 +458,6 @@ function AssignmentsView({ readerId, readerName, readerLevel }: AssignmentsViewP
 function PrePublicationView({ readerId, readerName }: { readerId: number; readerName: string }) {
   return (
     <div className="space-y-6">
-      {/* Status message */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -325,14 +473,13 @@ function PrePublicationView({ readerId, readerName }: { readerId: number; reader
         </p>
       </motion.div>
 
-      {/* Unavailability calendar */}
       <div className="bg-white rounded-2xl border border-border shadow-sm p-6">
         <h3 className="font-serif text-lg text-primary flex items-center gap-2 mb-4">
           <CalendarIcon className="w-5 h-5 text-destructive" />
           Mis días no disponibles
         </h3>
         <p className="text-sm text-muted-foreground mb-5">
-          Toca los días en que <strong>NO</strong> podrás asistir a ninguna misa. El administrador lo tomará en cuenta al generar el calendario.
+          Toca los días en que <strong>NO</strong> podrás asistir. El administrador lo tomará en cuenta al generar el calendario.
         </p>
         <UnavailCalendar selectedReaderId={readerId} />
       </div>
@@ -349,14 +496,12 @@ export default function ReaderPortal() {
 
   const selectedReader = readers.find(r => r.id === selectedReaderId);
 
-  // Check if there are ANY published entries for this reader
   const hasPublishedAssignments = selectedReaderId
     ? publishedCalendar.some(c => c.readerId === selectedReaderId)
     : false;
 
   return (
     <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in duration-500">
-      {/* Header */}
       <div className="text-center space-y-3">
         <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
           <UserCircle className="w-8 h-8 text-primary" />
@@ -367,7 +512,6 @@ export default function ReaderPortal() {
         </p>
       </div>
 
-      {/* Reader selector */}
       <div className="bg-white p-6 rounded-2xl border border-border shadow-sm">
         <label className="block text-sm font-medium mb-2">Mi Nombre</label>
         {loadingReaders ? (
@@ -391,7 +535,6 @@ export default function ReaderPortal() {
         )}
       </div>
 
-      {/* Two-phase content */}
       <AnimatePresence mode="wait">
         {selectedReaderId && selectedReader && (
           <motion.div

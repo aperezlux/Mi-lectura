@@ -24,6 +24,7 @@ export * from "./readerLevel";
 export * from "./readerStat";
 export * from "./swapEntriesInput";
 export * from "./unavailability";
+export * from "./unavailabilityShift";
 export * from "./updateCalendarEntryInput";
 export * from "./updateReaderInput";
 export * from "./updateReaderInputLevel";

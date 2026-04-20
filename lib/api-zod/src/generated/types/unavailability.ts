@@ -5,10 +5,12 @@
  * LiturgiaFlow Pro API
  * OpenAPI spec version: 0.3.0
  */
+import type { UnavailabilityShift } from "./unavailabilityShift";
 
 export interface Unavailability {
   id: number;
   readerId: number;
   blockedDate: Date;
   readerName?: string;
+  shift: UnavailabilityShift;
 }

@@ -73,16 +73,27 @@ export interface UpdateReaderInput {
   level?: UpdateReaderInputLevel;
 }
 
+export type UnavailabilityShift =
+  (typeof UnavailabilityShift)[keyof typeof UnavailabilityShift];
+
+export const UnavailabilityShift = {
+  morning: "morning",
+  evening: "evening",
+  all: "all",
+} as const;
+
 export interface Unavailability {
   id: number;
   readerId: number;
   blockedDate: string;
   readerName?: string;
+  shift: UnavailabilityShift;
 }
 
 export interface CreateUnavailabilityInput {
   readerId: number;
   blockedDate: string;
+  shift?: UnavailabilityShift;
 }
 
 export type MassScheduleDayType =
@@ -90,7 +101,8 @@ export type MassScheduleDayType =
 
 export const MassScheduleDayType = {
   weekday: "weekday",
-  thursday: "thursday",
+  thursday_am: "thursday_am",
+  thursday_pm: "thursday_pm",
   saturday_am: "saturday_am",
   saturday_pm: "saturday_pm",
   sunday_am: "sunday_am",

@@ -166,21 +166,13 @@ router.post("/calendar/generate", async (req, res) => {
     }
 
     const { startDate, period } = parsed.data;
-    const endDate =
-      period === "15days"
-        ? addDays(startDate, 14)
-        : (() => {
-            const d = new Date(startDate + "T12:00:00");
-            d.setMonth(d.getMonth() + 1);
-            d.setDate(d.getDate() - 1);
-            return d.toISOString().split("T")[0];
-          })();
 
     const assignments = await generateAssignments(startDate, period);
 
+    // Delete ALL calendar entries from startDate onward to ensure a clean slate
     await db
       .delete(calendarTable)
-      .where(and(gte(calendarTable.date, startDate), lte(calendarTable.date, endDate)));
+      .where(gte(calendarTable.date, startDate));
 
     if (assignments.length > 0) {
       await db.insert(calendarTable).values(
@@ -196,7 +188,10 @@ router.post("/calendar/generate", async (req, res) => {
       );
     }
 
-    const rows = await getEntriesWithJoins({ startDate, endDate });
+    const generatedEndDate = assignments.length > 0
+      ? assignments[assignments.length - 1].date
+      : startDate;
+    const rows = await getEntriesWithJoins({ startDate, endDate: generatedEndDate });
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "Failed to generate calendar");

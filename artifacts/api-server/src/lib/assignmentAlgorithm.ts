@@ -6,6 +6,8 @@ import {
   massSchedulesTable,
   ROLES_BY_DAY_TYPE,
   DEFAULT_SCHEDULES,
+  MORNING_DAY_TYPES,
+  EVENING_DAY_TYPES,
   type DayType,
 } from "@workspace/db/schema";
 import { eq, gte, lte, and, sql, asc, desc, isNotNull } from "drizzle-orm";
@@ -35,10 +37,10 @@ function generateDateRange(startDate: string, period: "15days" | "1month"): stri
   const endDate = new Date(start);
 
   if (period === "15days") {
-    endDate.setDate(endDate.getDate() + 14);
+    endDate.setDate(endDate.getDate() + 13); // 14 days total (2 weeks)
   } else {
     endDate.setMonth(endDate.getMonth() + 1);
-    endDate.setDate(endDate.getDate() - 1);
+    endDate.setDate(0); // last day of current month
   }
 
   let current = new Date(start);
@@ -56,10 +58,18 @@ function dayTypesForDayOfWeek(dow: number): DayType[] {
     case 2:
     case 3:
     case 5: return ["weekday"];
-    case 4: return ["thursday"];
+    case 4: return ["thursday_am", "thursday_pm"];
     case 6: return ["saturday_am", "saturday_pm"];
     default: return [];
   }
+}
+
+// Is a reader's shift blocking them from a specific day type?
+function isShiftBlocked(shift: string, dayType: DayType): boolean {
+  if (shift === "all") return true;
+  if (shift === "morning" && (MORNING_DAY_TYPES as string[]).includes(dayType)) return true;
+  if (shift === "evening" && (EVENING_DAY_TYPES as string[]).includes(dayType)) return true;
+  return false;
 }
 
 async function ensureDefaultSchedules() {
@@ -95,18 +105,10 @@ export async function generateAssignments(
 
   const allReaders = await db.select().from(readersTable).orderBy(readersTable.name);
 
-  const endDate =
-    period === "15days"
-      ? addDays(startDate, 14)
-      : (() => {
-          const d = new Date(startDate + "T12:00:00");
-          d.setMonth(d.getMonth() + 1);
-          d.setDate(d.getDate() - 1);
-          return d.toISOString().split("T")[0];
-        })();
+  const dates = generateDateRange(startDate, period);
+  const endDate = dates[dates.length - 1];
 
   if (allReaders.length === 0) {
-    const dates = generateDateRange(startDate, period);
     return dates.flatMap((date) => {
       const dow = getDayOfWeek(date);
       const dayTypes = dayTypesForDayOfWeek(dow);
@@ -135,12 +137,13 @@ export async function generateAssignments(
       )
     );
 
-  const blockedMap = new Map<number, Set<string>>();
+  // blockedMap: readerId → date → shift ("morning" | "evening" | "all")
+  const blockedMap = new Map<number, Map<string, string>>();
   for (const row of unavailabilityRows) {
     if (!blockedMap.has(row.readerId)) {
-      blockedMap.set(row.readerId, new Set());
+      blockedMap.set(row.readerId, new Map());
     }
-    blockedMap.get(row.readerId)!.add(row.blockedDate);
+    blockedMap.get(row.readerId)!.set(row.blockedDate, row.shift ?? "all");
   }
 
   // Historical total assignment counts (equity)
@@ -206,8 +209,6 @@ export async function generateAssignments(
     liturgicalSeason: string;
   }> = [];
 
-  const dates = generateDateRange(startDate, period);
-
   // Track session: date → set of readerIds used that day
   const usedPerDay = new Map<string, Set<number>>();
   // Proximity: date → list of readerIds used in saturday_pm
@@ -229,10 +230,11 @@ export async function generateAssignments(
     const currentWeek = getISOWeek(date);
 
     for (const schedule of daySchedules) {
-      const roles = ROLES_BY_DAY_TYPE[schedule.dayType as DayType] ?? [];
+      const dayType = schedule.dayType as DayType;
+      const roles = ROLES_BY_DAY_TYPE[dayType] ?? [];
 
       let proximityBlocked = new Set<number>();
-      if (schedule.dayType === "sunday_am") {
+      if (dayType === "sunday_am") {
         const prevSat = addDays(date, -1);
         if (satPmReaders.has(prevSat)) {
           proximityBlocked = new Set(satPmReaders.get(prevSat)!);
@@ -244,10 +246,14 @@ export async function generateAssignments(
 
         const eligible = allReaders
           .filter((r) => {
-            const blocked = blockedMap.get(r.id)?.has(date) ?? false;
+            const readerBlocks = blockedMap.get(r.id);
+            if (readerBlocks) {
+              const shift = readerBlocks.get(date);
+              if (shift && isShiftBlocked(shift, dayType)) return false;
+            }
             const usedThisDay = usedToday.has(r.id);
             const proximityBlock = proximityBlocked.has(r.id);
-            return !blocked && !usedThisDay && !proximityBlock;
+            return !usedThisDay && !proximityBlock;
           })
           .sort((a, b) => {
             // Primary: total assignment count (equity — less assigned = priority)
@@ -288,11 +294,10 @@ export async function generateAssignments(
             chosen.id,
             (assignmentCountSession.get(chosen.id) ?? 0) + 1
           );
-          // Update last role and last week for this session
           lastRoleMap.set(chosen.id, roleName);
           sessionLastWeek.set(chosen.id, currentWeek);
 
-          if (schedule.dayType === "saturday_pm") {
+          if (dayType === "saturday_pm") {
             if (!satPmReaders.has(date)) satPmReaders.set(date, []);
             satPmReaders.get(date)!.push(chosen.id);
           }

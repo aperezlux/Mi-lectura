@@ -52,22 +52,34 @@ pnpm --filter @workspace/db run push-force      # Force push schema (drops const
 
 ## Mass Schedule Day Types & Roles
 
-| Day Type | Days | Roles |
-|----------|------|-------|
-| `weekday` | Mon, Tue, Wed, Fri | 1ª Lectura, Salmo |
-| `thursday` | Thursday | 1ª Lectura, Salmo, Oraciones |
-| `saturday_am` | Saturday | Monitor, 1ª Lectura, Salmo, 2ª Lectura, Oraciones |
-| `saturday_pm` | Saturday | Monitor, 1ª Lectura, Salmo, 2ª Lectura, Oraciones |
-| `sunday_am` | Sunday | Monitor, Bienvenida 1, Bienvenida 2, 1ª Lectura, Salmo, 2ª Lectura, Oraciones |
-| `sunday_pm` | Sunday | Monitor, 1ª Lectura, Salmo, 2ª Lectura, Oraciones |
+| Day Type | Days | Time | Roles |
+|----------|------|------|-------|
+| `weekday` | Mon, Tue, Wed, Fri | 06:00 | 1ª Lectura, Salmo |
+| `thursday_am` | Thursday morning | 06:00 | 1ª Lectura, Salmo |
+| `thursday_pm` | Thursday evening (Solemne/Hora Santa) | 19:00 | 1ª Lectura, Salmo, Oraciones |
+| `saturday_am` | Saturday | 07:00 | Monitor, 1ª Lectura, Salmo, 2ª Lectura, Oraciones |
+| `saturday_pm` | Saturday | 18:00 | Monitor, 1ª Lectura, Salmo, 2ª Lectura, Oraciones |
+| `sunday_am` | Sunday | 08:00 | Monitor, Bienvenida 1, Bienvenida 2, 1ª Lectura, Salmo, 2ª Lectura, Oraciones |
+| `sunday_pm` | Sunday | 18:00 | Monitor, 1ª Lectura, Salmo, 2ª Lectura, Oraciones |
+
+## Unavailability Shifts
+
+- `"all"` — fully blocked (no mass on this day)
+- `"morning"` — blocks only morning masses (thursday_am, saturday_am, sunday_am, weekday)
+- `"evening"` — blocks only evening masses (thursday_pm, saturday_pm, sunday_pm)
+- Shift picker UI appears for Thu/Sat/Sun; weekdays always use "all"
+- Calendar badge colors: 🔴 red = total block, 🟡 amber = morning-only, 🟣 indigo = evening-only
 
 ## Assignment Algorithm Rules
 
 1. **Equity**: Readers with fewer total assignments are prioritized first
-2. **Same-day uniqueness**: A reader cannot appear twice on the same day across all masses
-3. **Proximity rule**: saturday_pm assignment → blocks sunday_am (obligatory rest)
-4. **Unavailability**: Blocked dates are respected in all assignments
-5. **Conflict validation**: PUT /calendar/:id and POST /calendar/swap both validate unavailability before saving
+2. **Week alternation**: Prefer readers not assigned during the current week
+3. **Role rotation**: Prefer readers who had a different role last time
+4. **Same-day uniqueness**: A reader cannot appear twice on the same day across all masses
+5. **Proximity rule**: saturday_pm assignment → blocks sunday_am (obligatory rest)
+6. **Shift-aware unavailability**: Respects morning/evening/all shift constraints
+7. **Period "15 días"** generates exactly 14 days (2 weeks); "1 mes" generates end of month
+8. **Generate clears all entries from startDate onward** — ensures clean slate per generation
 
 ## API Endpoints
 

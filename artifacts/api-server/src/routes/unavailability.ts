@@ -5,29 +5,23 @@ import { eq, and } from "drizzle-orm";
 
 const router: IRouter = Router();
 
+const SELECTED_FIELDS = {
+  id: unavailabilityTable.id,
+  readerId: unavailabilityTable.readerId,
+  blockedDate: unavailabilityTable.blockedDate,
+  shift: unavailabilityTable.shift,
+  readerName: readersTable.name,
+};
+
 router.get("/unavailability", async (req, res) => {
   try {
     const readerIdParam = req.query.readerId;
-    let query = db
-      .select({
-        id: unavailabilityTable.id,
-        readerId: unavailabilityTable.readerId,
-        blockedDate: unavailabilityTable.blockedDate,
-        readerName: readersTable.name,
-      })
-      .from(unavailabilityTable)
-      .leftJoin(readersTable, eq(unavailabilityTable.readerId, readersTable.id));
 
     if (readerIdParam) {
       const readerId = parseInt(readerIdParam as string);
       if (!isNaN(readerId)) {
         const rows = await db
-          .select({
-            id: unavailabilityTable.id,
-            readerId: unavailabilityTable.readerId,
-            blockedDate: unavailabilityTable.blockedDate,
-            readerName: readersTable.name,
-          })
+          .select(SELECTED_FIELDS)
           .from(unavailabilityTable)
           .leftJoin(readersTable, eq(unavailabilityTable.readerId, readersTable.id))
           .where(eq(unavailabilityTable.readerId, readerId));
@@ -36,7 +30,10 @@ router.get("/unavailability", async (req, res) => {
       }
     }
 
-    const rows = await query;
+    const rows = await db
+      .select(SELECTED_FIELDS)
+      .from(unavailabilityTable)
+      .leftJoin(readersTable, eq(unavailabilityTable.readerId, readersTable.id));
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "Failed to get unavailability");
@@ -52,45 +49,42 @@ router.post("/unavailability", async (req, res) => {
       return;
     }
 
+    const { readerId, blockedDate, shift = "all" } = parsed.data;
+
     const existing = await db
       .select()
       .from(unavailabilityTable)
       .where(
         and(
-          eq(unavailabilityTable.readerId, parsed.data.readerId),
-          eq(unavailabilityTable.blockedDate, parsed.data.blockedDate)
+          eq(unavailabilityTable.readerId, readerId),
+          eq(unavailabilityTable.blockedDate, blockedDate)
         )
       )
       .limit(1);
 
+    let targetId: number;
+
     if (existing.length > 0) {
-      const [row] = await db
-        .select({
-          id: unavailabilityTable.id,
-          readerId: unavailabilityTable.readerId,
-          blockedDate: unavailabilityTable.blockedDate,
-          readerName: readersTable.name,
-        })
-        .from(unavailabilityTable)
-        .leftJoin(readersTable, eq(unavailabilityTable.readerId, readersTable.id))
-        .where(eq(unavailabilityTable.id, existing[0].id))
-        .limit(1);
-      res.status(201).json(row);
-      return;
+      await db
+        .update(unavailabilityTable)
+        .set({ shift })
+        .where(eq(unavailabilityTable.id, existing[0].id));
+      targetId = existing[0].id;
+    } else {
+      const [inserted] = await db
+        .insert(unavailabilityTable)
+        .values({ readerId, blockedDate, shift })
+        .returning();
+      targetId = inserted.id;
     }
 
-    const [inserted] = await db.insert(unavailabilityTable).values(parsed.data).returning();
     const [row] = await db
-      .select({
-        id: unavailabilityTable.id,
-        readerId: unavailabilityTable.readerId,
-        blockedDate: unavailabilityTable.blockedDate,
-        readerName: readersTable.name,
-      })
+      .select(SELECTED_FIELDS)
       .from(unavailabilityTable)
       .leftJoin(readersTable, eq(unavailabilityTable.readerId, readersTable.id))
-      .where(eq(unavailabilityTable.id, inserted.id))
+      .where(eq(unavailabilityTable.id, targetId))
       .limit(1);
+
     res.status(201).json(row);
   } catch (err) {
     req.log.error({ err }, "Failed to create unavailability");

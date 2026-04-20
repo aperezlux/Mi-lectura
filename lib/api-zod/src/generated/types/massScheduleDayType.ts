@@ -11,7 +11,8 @@ export type MassScheduleDayType =
 
 export const MassScheduleDayType = {
   weekday: "weekday",
-  thursday: "thursday",
+  thursday_am: "thursday_am",
+  thursday_pm: "thursday_pm",
   saturday_am: "saturday_am",
   saturday_pm: "saturday_pm",
   sunday_am: "sunday_am",
