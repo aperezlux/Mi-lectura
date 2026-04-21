@@ -115,38 +115,6 @@ function getGeneratedAt(entries: CalendarEntry[]): string | null {
   return `${d.toLocaleDateString("es-GT", { day: "2-digit", month: "2-digit", year: "numeric" })} ${d.toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" })}`;
 }
 
-// ─── Week Grid View (5-column reference layout) ─────────────────────────────
-
-const GRID_COLUMNS = [
-  { key: "thursday_am", label: "Jue A.M.",  abbr: "JueAM" },
-  { key: "thursday_pm", label: "Jue P.M.",  abbr: "JuePM" },
-  { key: "saturday_am", label: "Sáb A.M.",  abbr: "SáAM" },
-  { key: "saturday_pm", label: "Sáb P.M.",  abbr: "SáPM" },
-  { key: "sunday_am",   label: "Dom A.M.",  abbr: "DoAM" },
-  { key: "sunday_pm",   label: "Dom P.M.",  abbr: "DoPM" },
-] as const;
-
-// Unified role rows (superset of all schedules)
-const GRID_ROLES = [
-  "Bienvenida 1",
-  "Bienvenida 2",
-  "Monitor",
-  "1ª Lectura",
-  "Salmo",
-  "2ª Lectura",
-  "Oraciones",
-];
-
-// Which roles apply to each day type
-const ROLES_FOR_COL: Record<string, Set<string>> = {
-  thursday_am: new Set(["1ª Lectura", "Salmo"]),
-  thursday_pm: new Set(["1ª Lectura", "Salmo", "Oraciones"]),
-  saturday_am: new Set(["Monitor", "1ª Lectura", "Salmo", "2ª Lectura", "Oraciones"]),
-  saturday_pm: new Set(["Monitor", "1ª Lectura", "Salmo", "2ª Lectura", "Oraciones"]),
-  sunday_am:   new Set(["Bienvenida 1", "Bienvenida 2", "Monitor", "1ª Lectura", "Salmo", "2ª Lectura", "Oraciones"]),
-  sunday_pm:   new Set(["Monitor", "1ª Lectura", "Salmo", "2ª Lectura", "Oraciones"]),
-};
-
 // ─── Period helpers ──────────────────────────────────────────────────────────
 
 const PERIOD_STORAGE_KEY = "liturgia_generated_period";
@@ -170,6 +138,62 @@ function getWeekMonday(dateStr: string): string {
   return d.toISOString().split("T")[0];
 }
 
+// Given the Monday of a week, compute the date for a JS day-of-week (0=Sun)
+function getDateForDow(weekMonday: string, dow: number): string {
+  const d = new Date(weekMonday + "T12:00:00");
+  const offset = dow === 0 ? 6 : dow - 1; // Mon=0 offset, Tue=1 offset, ..., Sun=6 offset
+  d.setDate(d.getDate() + offset);
+  return d.toISOString().split("T")[0];
+}
+
+// ─── Grid column definitions ─────────────────────────────────────────────────
+
+interface ColDef {
+  dow: number;
+  dayType: string;
+  label: string;
+  shortLabel: string;
+}
+
+// AM section: Mon → Sun AM (7 columns)
+const AM_COLUMNS: ColDef[] = [
+  { dow: 1, dayType: "weekday",     label: "Lunes",     shortLabel: "Lun" },
+  { dow: 2, dayType: "weekday",     label: "Martes",    shortLabel: "Mar" },
+  { dow: 3, dayType: "weekday",     label: "Miércoles", shortLabel: "Mié" },
+  { dow: 4, dayType: "thursday_am", label: "Jue ☀",    shortLabel: "Jue☀" },
+  { dow: 5, dayType: "weekday",     label: "Viernes",   shortLabel: "Vie" },
+  { dow: 6, dayType: "saturday_am", label: "Sáb ☀",    shortLabel: "Sáb☀" },
+  { dow: 0, dayType: "sunday_am",   label: "Dom ☀",    shortLabel: "Dom☀" },
+];
+
+// PM section: Thu PM, Sat PM, Sun PM (3 columns)
+const PM_COLUMNS: ColDef[] = [
+  { dow: 4, dayType: "thursday_pm", label: "Jue 🌙 Solemne", shortLabel: "Jue🌙" },
+  { dow: 6, dayType: "saturday_pm", label: "Sáb 🌙",         shortLabel: "Sáb🌙" },
+  { dow: 0, dayType: "sunday_pm",   label: "Dom 🌙",          shortLabel: "Dom🌙" },
+];
+
+// Role rows per section (superset)
+const AM_ROLES = ["Bienvenida 1", "Bienvenida 2", "Monitor", "1ª Lectura", "Salmo", "2ª Lectura", "Oraciones"];
+const PM_ROLES = ["Monitor", "1ª Lectura", "Salmo", "2ª Lectura", "Oraciones"];
+
+// Which roles apply per column in AM section
+const AM_ROLES_FOR: Record<string, Set<string>> = {
+  weekday:     new Set(["1ª Lectura", "Salmo"]),
+  thursday_am: new Set(["1ª Lectura", "Salmo"]),
+  saturday_am: new Set(["Monitor", "1ª Lectura", "Salmo", "2ª Lectura", "Oraciones"]),
+  sunday_am:   new Set(["Bienvenida 1", "Bienvenida 2", "Monitor", "1ª Lectura", "Salmo", "2ª Lectura", "Oraciones"]),
+};
+
+// Which roles apply per column in PM section
+const PM_ROLES_FOR: Record<string, Set<string>> = {
+  thursday_pm: new Set(["1ª Lectura", "Salmo", "Oraciones"]),
+  saturday_pm: new Set(["Monitor", "1ª Lectura", "Salmo", "2ª Lectura", "Oraciones"]),
+  sunday_pm:   new Set(["Monitor", "1ª Lectura", "Salmo", "2ª Lectura", "Oraciones"]),
+};
+
+// ─── WeekGridView ─────────────────────────────────────────────────────────────
+
 interface WeekGridViewProps {
   entries: CalendarEntry[];
   schedules: MassSchedule[];
@@ -177,146 +201,223 @@ interface WeekGridViewProps {
 }
 
 function WeekGridView({ entries, schedules, onEditEntry }: WeekGridViewProps) {
-  // Build scheduleId → dayType lookup
+  // scheduleId → dayType
   const scheduleTypeMap = useMemo(() => {
     const m = new Map<number, string>();
     for (const s of schedules) m.set(s.id, s.dayType);
     return m;
   }, [schedules]);
 
-  // Group entries by week (Mon key) → dayType → role → entry
-  const weeks = useMemo(() => {
-    const weekMap = new Map<string, Map<string, CalendarEntry[]>>();
+  // dayType → { time, name }
+  const scheduleInfoMap = useMemo(() => {
+    const m = new Map<string, { time: string; name: string }>();
+    for (const s of schedules) m.set(s.dayType, { time: s.time, name: s.name });
+    return m;
+  }, [schedules]);
 
+  // date::dayType → CalendarEntry[]
+  const entryLookup = useMemo(() => {
+    const m = new Map<string, CalendarEntry[]>();
     for (const e of entries) {
       if (!e.scheduleId) continue;
-      const dayType = scheduleTypeMap.get(e.scheduleId);
-      if (!dayType) continue;
-      // Only show in grid for the 5 key schedule types
-      if (!GRID_COLUMNS.some(c => c.key === dayType)) continue;
-
-      const weekKey = getWeekMonday(e.date);
-      if (!weekMap.has(weekKey)) weekMap.set(weekKey, new Map());
-      const weekData = weekMap.get(weekKey)!;
-      if (!weekData.has(dayType)) weekData.set(dayType, []);
-      weekData.get(dayType)!.push(e);
+      const dt = scheduleTypeMap.get(e.scheduleId);
+      if (!dt) continue;
+      const key = `${e.date}::${dt}`;
+      if (!m.has(key)) m.set(key, []);
+      m.get(key)!.push(e);
     }
-
-    // Sort weeks
-    return Array.from(weekMap.entries()).sort(([a], [b]) => a.localeCompare(b));
+    return m;
   }, [entries, scheduleTypeMap]);
 
-  if (weeks.length === 0) {
+  // Set of all dates that are in the generated period
+  const datesInPeriod = useMemo(() => new Set(entries.map(e => e.date)), [entries]);
+
+  // All unique week Mondays covered by entries
+  const weekKeys = useMemo(() => {
+    const ws = new Set<string>();
+    for (const e of entries) ws.add(getWeekMonday(e.date));
+    return [...ws].sort();
+  }, [entries]);
+
+  if (weekKeys.length === 0) {
     return (
       <div className="py-12 text-center text-muted-foreground border-2 border-dashed border-border rounded-2xl">
-        No hay asignaciones para mostrar en la cuadrícula.<br/>
-        <span className="text-sm">Genera el calendario primero desde la pestaña "Generar".</span>
+        No hay asignaciones para mostrar.<br/>
+        <span className="text-sm">Genera el calendario desde la pestaña "Generar".</span>
       </div>
     );
   }
 
+  // Helper: look up a single entry by date, dayType, role
+  const getEntry = (date: string, dayType: string, role: string): CalendarEntry | undefined =>
+    entryLookup.get(`${date}::${dayType}`)?.find(e => parseRolePart(e.role) === role);
+
+  // Render a single grid cell
+  const renderCell = (
+    date: string,
+    dayType: string,
+    role: string,
+    rolesForCol: Record<string, Set<string>>,
+    colKey: string
+  ) => {
+    const applicable = rolesForCol[colKey]?.has(role);
+    if (!applicable) {
+      return (
+        <td key={colKey} className="px-2 py-2 text-center border-l border-primary/10 bg-muted/5">
+          <span className="text-muted-foreground/20 text-xs">—</span>
+        </td>
+      );
+    }
+    if (!datesInPeriod.has(date)) {
+      return (
+        <td key={colKey} className="px-2 py-2 text-center border-l border-primary/10 bg-muted/10">
+          <span className="text-muted-foreground/30 text-xs italic">fuera</span>
+        </td>
+      );
+    }
+    const entry = getEntry(date, dayType, role);
+    if (!entry) {
+      return (
+        <td key={colKey} className="px-2 py-2 text-center border-l border-primary/10">
+          <span className="text-muted-foreground/30 text-xs">—</span>
+        </td>
+      );
+    }
+    return (
+      <td key={colKey} className="px-2 py-2 text-center border-l border-primary/10">
+        {entry.isVacant ? (
+          <button onClick={() => onEditEntry(entry)} className="group w-full">
+            <Badge variant="destructive" className="text-[10px] cursor-pointer group-hover:bg-destructive/20 transition-colors whitespace-nowrap">
+              🚨 VACANTE
+            </Badge>
+          </button>
+        ) : (
+          <button onClick={() => onEditEntry(entry)} className="group text-center w-full">
+            <span
+              className="block text-[11px] font-semibold text-foreground group-hover:text-primary transition-colors leading-tight"
+              style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+            >
+              {entry.readerName?.split(" ")[0]}
+              <br />
+              <span className="font-normal text-muted-foreground">{entry.readerName?.split(" ").slice(1).join(" ")}</span>
+            </span>
+            {entry.logisticComment && (
+              <span className="text-[9px] text-amber-700 italic block mt-0.5">{entry.logisticComment}</span>
+            )}
+          </button>
+        )}
+      </td>
+    );
+  };
+
+  const renderSectionTable = (
+    weekKey: string,
+    columns: ColDef[],
+    roles: string[],
+    rolesFor: Record<string, Set<string>>,
+    sectionLabel: string,
+    sectionColor: string
+  ) => {
+    const colsWithDates = columns.map(col => ({
+      ...col,
+      date: getDateForDow(weekKey, col.dow),
+      info: scheduleInfoMap.get(col.dayType),
+    }));
+
+    // Only show roles that apply to at least one column AND at least one date is in period
+    const visibleRoles = roles.filter(role =>
+      colsWithDates.some(col => rolesFor[col.dayType]?.has(role) && datesInPeriod.has(col.date))
+    );
+    if (visibleRoles.length === 0) return null;
+
+    return (
+      <div className="overflow-x-auto rounded-xl border border-primary/20 shadow-sm">
+        <table className="w-full text-sm">
+          <thead>
+            <tr>
+              <th
+                colSpan={columns.length + 1}
+                className={cn("px-3 py-1.5 text-left text-xs font-bold tracking-widest uppercase", sectionColor)}
+              >
+                {sectionLabel}
+              </th>
+            </tr>
+            <tr className="border-b border-primary/20">
+              <th className="px-3 py-2 text-left text-xs font-semibold text-primary bg-secondary/60 w-24 whitespace-nowrap">
+                Función
+              </th>
+              {colsWithDates.map(col => {
+                const inPrd = datesInPeriod.has(col.date);
+                return (
+                  <th key={`${col.dayType}-${col.dow}`} className={cn("px-2 py-2 text-center border-l border-primary/10", inPrd ? "bg-secondary/60" : "bg-muted/30")}>
+                    <div className="font-bold text-primary text-[11px]" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                      {col.label}
+                    </div>
+                    {col.info && inPrd && (
+                      <div className="text-primary/70 text-[10px] font-mono">{col.info.time}</div>
+                    )}
+                    {inPrd && (
+                      <div className="text-muted-foreground text-[10px]">
+                        {format(new Date(col.date + "T12:00:00"), "d MMM", { locale: es })}
+                      </div>
+                    )}
+                    {!inPrd && (
+                      <div className="text-muted-foreground/40 text-[10px]">—</div>
+                    )}
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {visibleRoles.map(role => (
+              <tr key={role} className="hover:bg-muted/20 transition-colors">
+                <td className="px-3 py-2 text-xs font-semibold text-muted-foreground bg-secondary/20 border-r border-primary/10 whitespace-nowrap">
+                  {role}
+                </td>
+                {colsWithDates.map(col =>
+                  renderCell(col.date, col.dayType, role, rolesFor, `${col.dow}:${col.dayType}`)
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-8">
-      {weeks.map(([weekKey, weekData]) => {
+      {weekKeys.map(weekKey => {
         const weekEnd = new Date(weekKey + "T12:00:00");
         weekEnd.setDate(weekEnd.getDate() + 6);
         const weekLabel = `${format(new Date(weekKey + "T12:00:00"), "d MMM", { locale: es })} – ${format(weekEnd, "d MMM yyyy", { locale: es })}`;
 
-        // Get schedule info per column
-        const colInfo = GRID_COLUMNS.map(col => {
-          const colEntries = weekData.get(col.key) ?? [];
-          const date = colEntries[0]?.date;
-          const schedule = schedules.find(s => s.dayType === col.key && s.isActive);
-          return { ...col, entries: colEntries, date, schedule };
-        });
-
         return (
-          <div key={weekKey}>
+          <div key={weekKey} className="space-y-3">
             {/* Week header */}
-            <div className="flex items-center gap-3 mb-3">
+            <div className="flex items-center gap-3">
               <div className="h-px flex-1 bg-primary/20" />
-              <span className="text-sm font-semibold text-primary px-2 whitespace-nowrap" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+              <span className="text-sm font-semibold text-primary px-3 whitespace-nowrap"
+                style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
                 Semana del {weekLabel}
               </span>
               <div className="h-px flex-1 bg-primary/20" />
             </div>
 
-            <div className="overflow-x-auto rounded-2xl border border-primary/20 shadow-sm">
-              <table className="w-full min-w-[640px] text-sm">
-                {/* Column headers */}
-                <thead>
-                  <tr className="border-b-2 border-primary/20">
-                    <th className="px-3 py-3 text-left text-xs font-semibold text-primary bg-secondary/60 w-28">
-                      Función
-                    </th>
-                    {colInfo.map(col => (
-                      <th key={col.key} className="px-3 py-2 text-center bg-secondary/60 border-l border-primary/10">
-                        <div className="font-bold text-primary text-xs" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{col.label}</div>
-                        {col.schedule && (
-                          <div className="text-primary/70 text-xs font-mono font-semibold">{col.schedule.time}</div>
-                        )}
-                        {col.date && (
-                          <div className="text-muted-foreground text-xs">{format(new Date(col.date + "T12:00:00"), "d MMM", { locale: es })}</div>
-                        )}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
+            {/* AM section */}
+            {renderSectionTable(
+              weekKey, AM_COLUMNS, AM_ROLES, AM_ROLES_FOR,
+              "☀ Turno Mañana",
+              "bg-amber-50 text-amber-800 border-b border-amber-100"
+            )}
 
-                {/* Role rows */}
-                <tbody className="divide-y divide-border">
-                  {GRID_ROLES.map(role => {
-                    // Check if this role appears in ANY column this week
-                    const hasAnything = colInfo.some(col => ROLES_FOR_COL[col.key]?.has(role));
-                    if (!hasAnything) return null;
-
-                    return (
-                      <tr key={role} className="hover:bg-muted/20 transition-colors">
-                        <td className="px-3 py-2.5 text-xs font-semibold text-muted-foreground bg-secondary/20 border-r border-primary/10 whitespace-nowrap">
-                          {role}
-                        </td>
-                        {colInfo.map(col => {
-                          const applicable = ROLES_FOR_COL[col.key]?.has(role);
-                          if (!applicable) {
-                            return <td key={col.key} className="px-2 py-2.5 text-center border-l border-primary/10 bg-muted/10"><span className="text-muted-foreground/30 text-xs">—</span></td>;
-                          }
-
-                          const entry = col.entries.find(e => parseRolePart(e.role) === role);
-                          if (!entry) {
-                            return (
-                              <td key={col.key} className="px-2 py-2.5 text-center border-l border-primary/10">
-                                <span className="text-muted-foreground/40 text-xs italic">sin fecha</span>
-                              </td>
-                            );
-                          }
-
-                          return (
-                            <td key={col.key} className="px-2 py-2.5 text-center border-l border-primary/10">
-                              {entry.isVacant ? (
-                                <button onClick={() => onEditEntry(entry)} className="group">
-                                  <Badge variant="destructive" className="text-xs cursor-pointer group-hover:bg-destructive/20 transition-colors">
-                                    🚨 VACANTE
-                                  </Badge>
-                                </button>
-                              ) : (
-                                <button onClick={() => onEditEntry(entry)} className="group text-left w-full">
-                                  <span className="block text-xs font-semibold text-foreground group-hover:text-primary transition-colors" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
-                                    {entry.readerName}
-                                  </span>
-                                  {entry.logisticComment && (
-                                    <span className="text-[10px] text-amber-700 italic block mt-0.5">{entry.logisticComment}</span>
-                                  )}
-                                </button>
-                              )}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            {/* PM section */}
+            {renderSectionTable(
+              weekKey, PM_COLUMNS, PM_ROLES, PM_ROLES_FOR,
+              "🌙 Turno Tarde / Noche",
+              "bg-indigo-50 text-indigo-800 border-b border-indigo-100"
+            )}
           </div>
         );
       })}
