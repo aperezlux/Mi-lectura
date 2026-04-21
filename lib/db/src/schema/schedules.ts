@@ -17,7 +17,7 @@ export const ROLES_BY_DAY_TYPE: Record<DayType, string[]> = {
   weekday:     ["1ª Lectura", "Salmo"],
   thursday_am: ["1ª Lectura", "Salmo"],
   thursday_pm: ["1ª Lectura", "Salmo", "Oraciones"],
-  saturday_am: ["Monitor", "1ª Lectura", "Salmo", "2ª Lectura", "Oraciones"],
+  saturday_am: ["1ª Lectura", "Salmo"],
   saturday_pm: ["Monitor", "1ª Lectura", "Salmo", "2ª Lectura", "Oraciones"],
   sunday_am:   ["Monitor", "Bienvenida 1", "Bienvenida 2", "1ª Lectura", "Salmo", "2ª Lectura", "Oraciones"],
   sunday_pm:   ["Monitor", "1ª Lectura", "Salmo", "2ª Lectura", "Oraciones"],

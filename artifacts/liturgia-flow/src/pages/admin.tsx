@@ -181,7 +181,7 @@ const PM_ROLES = ["Monitor", "1ª Lectura", "Salmo", "2ª Lectura", "Oraciones"]
 const AM_ROLES_FOR: Record<string, Set<string>> = {
   weekday:     new Set(["1ª Lectura", "Salmo"]),
   thursday_am: new Set(["1ª Lectura", "Salmo"]),
-  saturday_am: new Set(["Monitor", "1ª Lectura", "Salmo", "2ª Lectura", "Oraciones"]),
+  saturday_am: new Set(["1ª Lectura", "Salmo"]),
   sunday_am:   new Set(["Bienvenida 1", "Bienvenida 2", "Monitor", "1ª Lectura", "Salmo", "2ª Lectura", "Oraciones"]),
 };
 

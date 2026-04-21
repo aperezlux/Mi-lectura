@@ -244,41 +244,48 @@ export async function generateAssignments(
       for (const roleName of roles) {
         const usedToday = usedPerDay.get(date)!;
 
+        // Sorting comparator shared between passes
+        const sortReaders = (a: typeof allReaders[0], b: typeof allReaders[0]) => {
+          // Primary: session assignment count (equity)
+          const countA = assignmentCountSession.get(a.id) ?? 0;
+          const countB = assignmentCountSession.get(b.id) ?? 0;
+          if (countA !== countB) return countA - countB;
+          // Secondary: week alternation
+          const sameWeekA = sessionLastWeek.get(a.id) === currentWeek ? 1 : 0;
+          const sameWeekB = sessionLastWeek.get(b.id) === currentWeek ? 1 : 0;
+          if (sameWeekA !== sameWeekB) return sameWeekA - sameWeekB;
+          // Tertiary: role rotation
+          const sameRoleA = lastRoleMap.get(a.id) === roleName ? 1 : 0;
+          const sameRoleB = lastRoleMap.get(b.id) === roleName ? 1 : 0;
+          return sameRoleA - sameRoleB;
+        };
+
+        // Pass 1: strict — no same-day reuse, no proximity conflict
         const eligible = allReaders
           .filter((r) => {
-            const readerBlocks = blockedMap.get(r.id);
-            if (readerBlocks) {
-              const shift = readerBlocks.get(date);
-              if (shift && isShiftBlocked(shift, dayType)) return false;
-            }
-            const usedThisDay = usedToday.has(r.id);
-            const proximityBlock = proximityBlocked.has(r.id);
-            return !usedThisDay && !proximityBlock;
+            const shift = blockedMap.get(r.id)?.get(date);
+            if (shift && isShiftBlocked(shift, dayType)) return false;
+            return !usedToday.has(r.id) && !proximityBlocked.has(r.id);
           })
-          .sort((a, b) => {
-            // Primary: total assignment count (equity — less assigned = priority)
-            const countA = assignmentCountSession.get(a.id) ?? 0;
-            const countB = assignmentCountSession.get(b.id) ?? 0;
-            if (countA !== countB) return countA - countB;
+          .sort(sortReaders);
 
-            // Secondary: week alternation — prefer readers not assigned this week
-            const lastWeekA = sessionLastWeek.get(a.id);
-            const lastWeekB = sessionLastWeek.get(b.id);
-            const sameWeekA = lastWeekA === currentWeek ? 1 : 0;
-            const sameWeekB = lastWeekB === currentWeek ? 1 : 0;
-            if (sameWeekA !== sameWeekB) return sameWeekA - sameWeekB;
+        // Pass 2 fallback — relax same-day uniqueness (allow reader to serve twice)
+        // Only used when no one is available in Pass 1
+        const fallback = eligible.length === 0
+          ? allReaders
+              .filter((r) => {
+                const shift = blockedMap.get(r.id)?.get(date);
+                if (shift && isShiftBlocked(shift, dayType)) return false;
+                return !proximityBlocked.has(r.id);
+              })
+              .sort(sortReaders)
+          : [];
 
-            // Tertiary: role rotation — prefer readers who had a different role last time
-            const lastA = lastRoleMap.get(a.id);
-            const lastB = lastRoleMap.get(b.id);
-            const sameRoleA = lastA === roleName ? 1 : 0;
-            const sameRoleB = lastB === roleName ? 1 : 0;
-            return sameRoleA - sameRoleB;
-          });
+        const chosen = eligible[0] ?? fallback[0] ?? null;
 
         const fullRole = `${roleName} - ${schedule.name} ${schedule.time}`;
 
-        if (eligible.length === 0) {
+        if (!chosen) {
           results.push({
             date,
             role: fullRole,
@@ -288,7 +295,6 @@ export async function generateAssignments(
             liturgicalSeason: getLiturgicalSeason(date),
           });
         } else {
-          const chosen = eligible[0];
           usedToday.add(chosen.id);
           assignmentCountSession.set(
             chosen.id,
