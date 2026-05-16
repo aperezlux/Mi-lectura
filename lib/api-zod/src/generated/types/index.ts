@@ -29,3 +29,4 @@ export * from "./updateCalendarEntryInput";
 export * from "./updateReaderInput";
 export * from "./updateReaderInputLevel";
 export * from "./updateScheduleInput";
+export * from "./verifyPinInput";

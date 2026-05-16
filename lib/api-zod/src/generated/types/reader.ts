@@ -12,5 +12,6 @@ export interface Reader {
   name: string;
   whatsapp: string;
   level: ReaderLevel;
+  hasPin: boolean;
   createdAt: Date;
 }

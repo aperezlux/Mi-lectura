@@ -4,7 +4,7 @@ import {
   Plus, Edit2, Trash2, MessageCircle, AlertCircle, Sparkles,
   Calendar as CalIcon, Table as TableIcon, Clock, ArrowLeftRight,
   ChevronLeft, ChevronRight, Settings, Grid3X3, Globe, BarChart3,
-  TrendingUp, TrendingDown, Minus, SendHorizonal, CheckCircle2
+  TrendingUp, TrendingDown, Minus, SendHorizonal, CheckCircle2, KeyRound
 } from "lucide-react";
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval,
@@ -1177,11 +1177,18 @@ function ReadersTab() {
   const { create, update, remove } = useReaderMutations();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingReader, setEditingReader] = useState<Reader | null>(null);
-  const [formData, setFormData] = useState({ name: "", whatsapp: "", level: "Principiante" as UpdateReaderInputLevel });
+  const [formData, setFormData] = useState({ name: "", whatsapp: "", level: "Principiante" as UpdateReaderInputLevel, pin: "" });
 
-  const openCreate = () => { setEditingReader(null); setFormData({ name: "", whatsapp: "", level: "Principiante" }); setIsModalOpen(true); };
-  const openEdit = (r: Reader) => { setEditingReader(r); setFormData({ name: r.name, whatsapp: r.whatsapp, level: r.level }); setIsModalOpen(true); };
-  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); if (editingReader) update.mutate({ id: editingReader.id, data: formData }); else create.mutate({ data: formData as CreateReaderInput }); setIsModalOpen(false); };
+  const openCreate = () => { setEditingReader(null); setFormData({ name: "", whatsapp: "", level: "Principiante", pin: "" }); setIsModalOpen(true); };
+  const openEdit = (r: Reader) => { setEditingReader(r); setFormData({ name: r.name, whatsapp: r.whatsapp, level: r.level, pin: "" }); setIsModalOpen(true); };
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const { pin, ...base } = formData;
+    const data = pin.trim() ? { ...base, pin: pin.trim() } : base;
+    if (editingReader) update.mutate({ id: editingReader.id, data });
+    else create.mutate({ data: data as CreateReaderInput });
+    setIsModalOpen(false);
+  };
 
   if (isLoading) return <div className="py-12 flex justify-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>;
 
@@ -1199,7 +1206,13 @@ function ReadersTab() {
                 <h3 className="font-semibold text-lg">{reader.name}</h3>
                 <p className="text-muted-foreground text-sm flex items-center gap-1 mt-1"><MessageCircle className="w-3 h-3" /> {reader.whatsapp}</p>
               </div>
-              <Badge variant={reader.level === "Experto" ? "default" : "outline"}>{reader.level}</Badge>
+              <div className="flex flex-col items-end gap-1.5">
+                <Badge variant={reader.level === "Experto" ? "default" : "outline"}>{reader.level}</Badge>
+                {(reader as any).hasPin
+                  ? <span className="flex items-center gap-1 text-[10px] font-medium text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5"><KeyRound className="w-2.5 h-2.5" /> PIN activo</span>
+                  : <span className="flex items-center gap-1 text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5"><KeyRound className="w-2.5 h-2.5" /> Sin PIN</span>
+                }
+              </div>
             </div>
             <div className="mt-auto flex gap-2 pt-4 border-t border-border/50">
               <Button variant="secondary" size="sm" className="flex-1" onClick={() => openEdit(reader)}><Edit2 className="w-4 h-4 mr-2" /> Editar</Button>
@@ -1224,6 +1237,22 @@ function ReadersTab() {
           <div>
             <label className="block text-sm font-medium mb-1">Nivel</label>
             <SelectEl value={formData.level} onChange={v => setFormData({ ...formData, level: v as UpdateReaderInputLevel })} options={[{ label: "Principiante", value: "Principiante" }, { label: "Experto", value: "Experto" }]} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1 flex items-center gap-1.5">
+              <KeyRound className="w-3.5 h-3.5 text-primary" />
+              {editingReader ? "Nuevo PIN (vacío = no cambiar)" : "PIN de acceso al portal"}
+            </label>
+            <Input
+              type="password"
+              value={formData.pin}
+              onChange={e => setFormData({ ...formData, pin: e.target.value })}
+              placeholder={editingReader ? "Dejar vacío para mantener el PIN actual" : "Mínimo 4 caracteres (opcional)"}
+              minLength={formData.pin.trim() ? 4 : undefined}
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              El lector usará este PIN para entrar a su portal personal.
+            </p>
           </div>
           <div className="pt-4 flex gap-3">
             <Button type="button" variant="outline" className="flex-1" onClick={() => setIsModalOpen(false)}>Cancelar</Button>

@@ -19,4 +19,9 @@ export interface UpdateReaderInput {
    */
   whatsapp?: string;
   level?: UpdateReaderInputLevel;
+  /**
+   * @minLength 4
+   * @maxLength 20
+   */
+  pin?: string;
 }

@@ -4,6 +4,7 @@ import {
   useCreateReader,
   useUpdateReader,
   useDeleteReader,
+  useVerifyReaderPin,
   useGetCalendar,
   useGenerateCalendar,
   useUpdateCalendarEntry,
@@ -17,6 +18,8 @@ import {
   useUpdateSchedule,
 } from "@workspace/api-client-react";
 import { useToast } from "./use-toast";
+
+export { useVerifyReaderPin };
 
 export function useReaders() {
   return useGetReaders();

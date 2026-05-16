@@ -26,6 +26,7 @@ export interface Reader {
   name: string;
   whatsapp: string;
   level: ReaderLevel;
+  hasPin: boolean;
   createdAt: string;
 }
 
@@ -49,6 +50,11 @@ export interface CreateReaderInput {
    */
   whatsapp: string;
   level: CreateReaderInputLevel;
+  /**
+   * @minLength 4
+   * @maxLength 20
+   */
+  pin?: string;
 }
 
 export type UpdateReaderInputLevel =
@@ -71,6 +77,16 @@ export interface UpdateReaderInput {
    */
   whatsapp?: string;
   level?: UpdateReaderInputLevel;
+  /**
+   * @minLength 4
+   * @maxLength 20
+   */
+  pin?: string;
+}
+
+export interface VerifyPinInput {
+  readerId: number;
+  pin: string;
 }
 
 export type UnavailabilityShift =

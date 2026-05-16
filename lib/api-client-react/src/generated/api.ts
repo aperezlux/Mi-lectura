@@ -34,6 +34,7 @@ import type {
   UpdateCalendarEntryInput,
   UpdateReaderInput,
   UpdateScheduleInput,
+  VerifyPinInput,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -277,6 +278,92 @@ export const useCreateReader = <
   TContext
 > => {
   return useMutation(getCreateReaderMutationOptions(options));
+};
+
+/**
+ * @summary Verify reader PIN for portal access
+ */
+export const getVerifyReaderPinUrl = () => {
+  return `/api/readers/verify-pin`;
+};
+
+export const verifyReaderPin = async (
+  verifyPinInput: VerifyPinInput,
+  options?: RequestInit,
+): Promise<Reader> => {
+  return customFetch<Reader>(getVerifyReaderPinUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(verifyPinInput),
+  });
+};
+
+export const getVerifyReaderPinMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof verifyReaderPin>>,
+    TError,
+    { data: BodyType<VerifyPinInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof verifyReaderPin>>,
+  TError,
+  { data: BodyType<VerifyPinInput> },
+  TContext
+> => {
+  const mutationKey = ["verifyReaderPin"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof verifyReaderPin>>,
+    { data: BodyType<VerifyPinInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return verifyReaderPin(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type VerifyReaderPinMutationResult = NonNullable<
+  Awaited<ReturnType<typeof verifyReaderPin>>
+>;
+export type VerifyReaderPinMutationBody = BodyType<VerifyPinInput>;
+export type VerifyReaderPinMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Verify reader PIN for portal access
+ */
+export const useVerifyReaderPin = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof verifyReaderPin>>,
+    TError,
+    { data: BodyType<VerifyPinInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof verifyReaderPin>>,
+  TError,
+  { data: BodyType<VerifyPinInput> },
+  TContext
+> => {
+  return useMutation(getVerifyReaderPinMutationOptions(options));
 };
 
 /**

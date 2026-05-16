@@ -22,6 +22,7 @@ export const GetReadersResponseItem = zod.object({
   name: zod.string(),
   whatsapp: zod.string(),
   level: zod.enum(["Principiante", "Experto"]),
+  hasPin: zod.boolean(),
   createdAt: zod.coerce.date(),
 });
 export const GetReadersResponse = zod.array(GetReadersResponseItem);
@@ -35,6 +36,9 @@ export const createReaderBodyNameMax = 100;
 export const createReaderBodyWhatsappMin = 7;
 export const createReaderBodyWhatsappMax = 20;
 
+export const createReaderBodyPinMin = 4;
+export const createReaderBodyPinMax = 20;
+
 export const CreateReaderBody = zod.object({
   name: zod.string().min(createReaderBodyNameMin).max(createReaderBodyNameMax),
   whatsapp: zod
@@ -42,6 +46,28 @@ export const CreateReaderBody = zod.object({
     .min(createReaderBodyWhatsappMin)
     .max(createReaderBodyWhatsappMax),
   level: zod.enum(["Principiante", "Experto"]),
+  pin: zod
+    .string()
+    .min(createReaderBodyPinMin)
+    .max(createReaderBodyPinMax)
+    .optional(),
+});
+
+/**
+ * @summary Verify reader PIN for portal access
+ */
+export const VerifyReaderPinBody = zod.object({
+  readerId: zod.number(),
+  pin: zod.string(),
+});
+
+export const VerifyReaderPinResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  whatsapp: zod.string(),
+  level: zod.enum(["Principiante", "Experto"]),
+  hasPin: zod.boolean(),
+  createdAt: zod.coerce.date(),
 });
 
 /**
@@ -57,6 +83,9 @@ export const updateReaderBodyNameMax = 100;
 export const updateReaderBodyWhatsappMin = 7;
 export const updateReaderBodyWhatsappMax = 20;
 
+export const updateReaderBodyPinMin = 4;
+export const updateReaderBodyPinMax = 20;
+
 export const UpdateReaderBody = zod.object({
   name: zod
     .string()
@@ -69,6 +98,11 @@ export const UpdateReaderBody = zod.object({
     .max(updateReaderBodyWhatsappMax)
     .optional(),
   level: zod.enum(["Principiante", "Experto"]).optional(),
+  pin: zod
+    .string()
+    .min(updateReaderBodyPinMin)
+    .max(updateReaderBodyPinMax)
+    .optional(),
 });
 
 export const UpdateReaderResponse = zod.object({
@@ -76,6 +110,7 @@ export const UpdateReaderResponse = zod.object({
   name: zod.string(),
   whatsapp: zod.string(),
   level: zod.enum(["Principiante", "Experto"]),
+  hasPin: zod.boolean(),
   createdAt: zod.coerce.date(),
 });
 
