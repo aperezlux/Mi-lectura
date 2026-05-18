@@ -1,0 +1,53 @@
+Prompt Maestro: Generación de App "LiturgiaFlow Pro" (Full-Stack)
+Contexto del Sistema:
+Genera el código completo para una Progressive Web App (PWA) de gestión litúrgica. La app debe ser funcional, responsive (Mobile-First) y resistente a errores de usuario (Data Validation).
+
+1. Arquitectura y Tecnologías:
+
+Frontend: React.js con Tailwind CSS (diseño limpio, botones grandes de 44px).
+
+Backend/Base de Datos: Supabase (PostgreSQL) para manejo de usuarios, roles y bloqueos.
+
+Estado: Gestión de estado robusta para evitar cierres inesperados (Error Boundaries).
+
+2. Esquema de Datos (Modelos):
+
+Lectores: ID, Nombre, WhatsApp, Nivel (Principiante/Experto).
+
+Indisponibilidad: ID_Lector, Fecha_Bloqueada.
+
+Calendario: ID, Fecha, Rol, ID_Lector, Comentario_Logistico, Version_Timestamp.
+
+3. Lógica de Asignación (El Algoritmo):
+
+Periodos: Selector para generar 15 días o 1 mes.
+
+Restricciones: 1. No asignar en Fechas Bloqueadas del lector.
+2. No repetir lector el mismo día.
+3. Regla de Proximidad: Si lee Sábado P.M., bloquear Domingo A.M.
+4. Equidad: Priorizar lectores con menos participaciones históricas.
+
+Alerta de Vacantes: Si no hay lectores para un puesto, dejar como "VACANTE" y notificar al admin.
+
+4. Flujo del Administrador (UX):
+
+Paso 1: Pantalla de Reconfirmación con resumen de bajas.
+
+Paso 2 (Edición): Vista de tabla con colores litúrgicos (Verde, Morado, Dorado). Permitir cambiar función o persona mediante un selector (Dropdown) que valide conflictos en tiempo real.
+
+Paso 3 (Avisos): Campo de texto para añadir "Comentarios del día" (ej. "Llegar 20 min antes").
+
+Paso 4 (Envío): Botón para abrir WhatsApp con el calendario completo y personalizado generado con la fecha de hoy.
+
+5. Interfaz de Usuario (Lector):
+
+Acceso simple para marcar días de inasistencia en un calendario visual.
+
+6. Estabilidad:
+
+Implementar validaciones de entrada para que la app no se bloquee con datos nulos o formatos de teléfono incorrectos.
+
+Soporte Offline para consultar el calendario sin internet.
+
+Instrucción Final:
+"Por favor, genera el código de los componentes principales (App, Calendar, AdminPanel), el archivo de configuración de la base de datos y la lógica del algoritmo de asignación en TypeScript."
