@@ -127,7 +127,11 @@ function UnavailCalendar({ selectedReaderId }: UnavailCalendarProps) {
 
   const handleDayClick = (day: Date) => {
     const dateStr = format(day, "yyyy-MM-dd");
+<<<<<<< HEAD
     const existing = Array.isArray(unavailabilities) ? unavailabilities.find(u => u.blockedDate === dateStr) : undefined;
+=======
+    const existing = unavailabilities.find(u => u.blockedDate === dateStr);
+>>>>>>> 61822b21e5b2231cd3834d0bcb3e0c696911f141
 
     if (existing) {
       // Always unblock on click if already blocked
@@ -196,7 +200,11 @@ function UnavailCalendar({ selectedReaderId }: UnavailCalendarProps) {
         {Array.from({ length: emptyCells }).map((_, i) => <div key={`p-${i}`} />)}
         {daysInMonth.map(day => {
           const dateStr = format(day, "yyyy-MM-dd");
+<<<<<<< HEAD
           const unavail = Array.isArray(unavailabilities) ? unavailabilities.find(u => u.blockedDate === dateStr) : undefined;
+=======
+          const unavail = unavailabilities.find(u => u.blockedDate === dateStr);
+>>>>>>> 61822b21e5b2231cd3834d0bcb3e0c696911f141
           const shift = (unavail?.shift ?? null) as Shift | null;
           const isBlocked = !!unavail;
           const isPartial = isBlocked && shift !== "all";
@@ -499,9 +507,13 @@ export default function ReaderPortal() {
   const { data: publishedCalendar = [] } = useCalendar({ publishedOnly: true });
   const verifyPin = useVerifyReaderPin();
 
+<<<<<<< HEAD
   const selectedReader = Array.isArray(readers)
   ? readers.find(r => r.id === selectedReaderId)
   : null;
+=======
+  const selectedReader = readers.find(r => r.id === selectedReaderId);
+>>>>>>> 61822b21e5b2231cd3834d0bcb3e0c696911f141
   const needsPin = !!(selectedReader as any)?.hasPin;
 
   const handleSelectReader = (id: number | null) => {
