@@ -499,7 +499,9 @@ export default function ReaderPortal() {
   const { data: publishedCalendar = [] } = useCalendar({ publishedOnly: true });
   const verifyPin = useVerifyReaderPin();
 
-  const selectedReader = readers.find(r => r.id === selectedReaderId);
+  const selectedReader = Array.isArray(readers)
+  ? readers.find(r => r.id === selectedReaderId)
+  : null;
   const needsPin = !!(selectedReader as any)?.hasPin;
 
   const handleSelectReader = (id: number | null) => {
