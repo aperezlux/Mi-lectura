@@ -698,7 +698,7 @@ function EditModal({ entry, sameDay, readers, allUnavailability, onClose, onReas
             <p className="text-sm text-muted-foreground">Elige otra asignación del mismo día para intercambiar lectores.</p>
             <SelectEl value={swapTargetId} onChange={setSwapTargetId} placeholder="-- Seleccionar --" options={otherEntries.map(e => ({ label: `${parseRolePart(e.role)} → ${e.isVacant ? "VACANTE" : e.readerName}`, value: e.id.toString() }))} />
             {swapTargetId && (() => {
-              const target = otherEntries.find(e => e.id.toString() === swapTargetId);
+              const target = Array.isArray(otherEntries) ? otherEntries.find(e => e.id.toString() === swapTargetId) : undefined;
               return (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-900">
                   <p className="font-medium mb-1">Resultado del intercambio:</p>

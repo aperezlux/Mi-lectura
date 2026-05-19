@@ -127,7 +127,7 @@ function UnavailCalendar({ selectedReaderId }: UnavailCalendarProps) {
 
   const handleDayClick = (day: Date) => {
     const dateStr = format(day, "yyyy-MM-dd");
-    const existing = unavailabilities.find(u => u.blockedDate === dateStr);
+    const existing = Array.isArray(unavailabilities) ? unavailabilities.find(u => u.blockedDate === dateStr) : undefined;
 
     if (existing) {
       // Always unblock on click if already blocked
@@ -196,7 +196,7 @@ function UnavailCalendar({ selectedReaderId }: UnavailCalendarProps) {
         {Array.from({ length: emptyCells }).map((_, i) => <div key={`p-${i}`} />)}
         {daysInMonth.map(day => {
           const dateStr = format(day, "yyyy-MM-dd");
-          const unavail = unavailabilities.find(u => u.blockedDate === dateStr);
+          const unavail = Array.isArray(unavailabilities) ? unavailabilities.find(u => u.blockedDate === dateStr) : undefined;
           const shift = (unavail?.shift ?? null) as Shift | null;
           const isBlocked = !!unavail;
           const isPartial = isBlocked && shift !== "all";
