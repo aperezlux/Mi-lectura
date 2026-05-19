@@ -127,11 +127,10 @@ function UnavailCalendar({ selectedReaderId }: UnavailCalendarProps) {
 
   const handleDayClick = (day: Date) => {
     const dateStr = format(day, "yyyy-MM-dd");
-<<<<<<< HEAD
+
     const existing = Array.isArray(unavailabilities) ? unavailabilities.find(u => u.blockedDate === dateStr) : undefined;
-=======
-    const existing = unavailabilities.find(u => u.blockedDate === dateStr);
->>>>>>> 61822b21e5b2231cd3834d0bcb3e0c696911f141
+
+
 
     if (existing) {
       // Always unblock on click if already blocked
