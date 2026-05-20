@@ -16,13 +16,20 @@ import {
   useDeleteUnavailability,
   useGetSchedules,
   useUpdateSchedule,
+  type Reader,
+  type CalendarEntry,
+  type ReaderStat,
+  type Unavailability,
+  type MassSchedule,
 } from "@workspace/api-client-react";
+import { ensureArray } from "@/lib/utils";
 import { useToast } from "./use-toast";
 
 export { useVerifyReaderPin };
 
 export function useReaders() {
-  return useGetReaders();
+  const query = useGetReaders();
+  return { ...query, data: ensureArray<Reader>(query.data) };
 }
 
 export function useReaderMutations() {
@@ -64,11 +71,13 @@ export function useReaderMutations() {
 }
 
 export function useCalendar(params?: { startDate?: string; endDate?: string; publishedOnly?: boolean }) {
-  return useGetCalendar(params);
+  const query = useGetCalendar(params);
+  return { ...query, data: ensureArray<CalendarEntry>(query.data) };
 }
 
 export function useCalendarStats() {
-  return useGetCalendarStats();
+  const query = useGetCalendarStats();
+  return { ...query, data: ensureArray<ReaderStat>(query.data) };
 }
 
 export function useCalendarMutations() {
@@ -83,7 +92,7 @@ export function useCalendarMutations() {
         toast({ title: "Calendario generado (borrador)", description: "Revisa el calendario y pulsa 'Publicar' cuando esté listo." });
       },
       onError: (err: any) => {
-        const msg = err?.response?.data?.error ?? "No se pudo generar el calendario.";
+        const msg = err?.response?.data?.error ?? err?.data?.error ?? "No se pudo generar el calendario.";
         toast({ title: "Error", description: msg, variant: "destructive" });
       }
     }
@@ -97,7 +106,7 @@ export function useCalendarMutations() {
         toast({ title: "Asignación actualizada", description: "El cambio ha sido guardado." });
       },
       onError: (err: any) => {
-        const msg = err?.response?.data?.error ?? "No se pudo actualizar la asignación.";
+        const msg = err?.response?.data?.error ?? err?.data?.error ?? "No se pudo actualizar la asignación.";
         toast({ title: "Conflicto detectado", description: msg, variant: "destructive" });
       }
     }
@@ -110,7 +119,7 @@ export function useCalendarMutations() {
         toast({ title: "Intercambio realizado", description: "Las asignaciones han sido intercambiadas." });
       },
       onError: (err: any) => {
-        const msg = err?.response?.data?.error ?? "No se pudo realizar el intercambio.";
+        const msg = err?.response?.data?.error ?? err?.data?.error ?? "No se pudo realizar el intercambio.";
         toast({ title: "Conflicto detectado", description: msg, variant: "destructive" });
       }
     }
@@ -133,7 +142,8 @@ export function useCalendarMutations() {
 }
 
 export function useUnavailability(readerId?: number) {
-  return useGetUnavailability({ readerId });
+  const query = useGetUnavailability({ readerId });
+  return { ...query, data: ensureArray<Unavailability>(query.data) };
 }
 
 export function useUnavailabilityMutations() {
@@ -162,7 +172,8 @@ export function useUnavailabilityMutations() {
 }
 
 export function useSchedules() {
-  return useGetSchedules();
+  const query = useGetSchedules();
+  return { ...query, data: ensureArray<MassSchedule>(query.data) };
 }
 
 export function useScheduleMutations() {

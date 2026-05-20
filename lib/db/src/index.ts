@@ -1,16 +1,26 @@
 import { drizzle } from "drizzle-orm/node-postgres";
-import pg from "pg";
+import { Pool } from "pg";
 import * as schema from "./schema";
 
-const { Pool } = pg;
+export const pool = new Pool({
+  user: "mi_lectura_user",
+  host: "dpg-d85p7h3eo5us73bi9uv0-a.oregon-postgres.render.com",
+  database: "mi_lectura",
+  password: "ARnwG3dzFmAcEczb89hNzRKQFxpjhRrm",
+  port: 5432,
+  ssl: {
+    rejectUnauthorized: false,
+  },
+});
 
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
-  );
-}
+pool.connect()
+  .then(() => {
+    console.log("✅ PostgreSQL conectado");
+  })
+  .catch((err) => {
+    console.error("❌ Error PostgreSQL:", err);
+  });
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 export const db = drizzle(pool, { schema });
 
 export * from "./schema";

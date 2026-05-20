@@ -7,8 +7,16 @@ import { AuthProvider, useAuth } from "@/context/auth";
 import AdminPage from "@/pages/admin";
 import ReaderPortal from "@/pages/reader";
 import NotFound from "@/pages/not-found";
+import { ErrorBoundary } from "@/components/error-boundary";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 function ProtectedAdmin() {
   const { isAdmin } = useAuth();
@@ -31,11 +39,13 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <Layout>
-              <Router />
-            </Layout>
-          </WouterRouter>
+          <ErrorBoundary>
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+              <Layout>
+                <Router />
+              </Layout>
+            </WouterRouter>
+          </ErrorBoundary>
         </AuthProvider>
         <Toaster />
       </TooltipProvider>

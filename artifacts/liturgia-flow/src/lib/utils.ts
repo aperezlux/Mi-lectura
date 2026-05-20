@@ -6,6 +6,11 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** Coerce unknown API/query data to a safe array (avoids .map/.find crashes). */
+export function ensureArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
 export function formatDate(dateString: string) {
   if (!dateString) return "";
   const d = parseISO(dateString);
@@ -46,12 +51,13 @@ export function getLiturgicalSeason(dateString: string) {
   return { name: "Tiempo Ordinario", colorClass: "bg-verde/15 text-verde border-verde/30" };
 }
 
-export function checkProximityConflict(calendar: any[], readerId: number, dateString: string) {
+export function checkProximityConflict(calendar: unknown, readerId: number, dateString: string) {
   if (!readerId) return false;
   const targetDate = parseISO(dateString);
-  
+  const entries = ensureArray<{ readerId?: number | null; date: string }>(calendar);
+
   // Find other assignments for this reader in the same week
-  const sameWeekAssignments = calendar.filter(entry => {
+  const sameWeekAssignments = entries.filter(entry => {
     if (entry.readerId !== readerId || entry.date === dateString) return false;
     return isSameWeek(parseISO(entry.date), targetDate, { weekStartsOn: 1 });
   });

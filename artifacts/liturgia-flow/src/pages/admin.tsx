@@ -15,7 +15,7 @@ import {
   useReaders, useReaderMutations, useCalendar, useCalendarMutations,
   useUnavailability, useSchedules, useScheduleMutations, useCalendarStats
 } from "@/hooks/use-liturgia";
-import { formatDate, getLiturgicalSeason, checkProximityConflict, cn } from "@/lib/utils";
+import { formatDate, getLiturgicalSeason, checkProximityConflict, cn, ensureArray } from "@/lib/utils";
 import type { Reader, CalendarEntry, CreateReaderInput, UpdateReaderInputLevel, MassSchedule } from "@workspace/api-client-react";
 
 // ─── Primitive UI Components ────────────────────────────────────────────────
@@ -249,8 +249,10 @@ function WeekGridView({ entries, schedules, onEditEntry }: WeekGridViewProps) {
   }
 
   // Helper: look up a single entry by date, dayType, role
-  const getEntry = (date: string, dayType: string, role: string): CalendarEntry | undefined =>
-    entryLookup.get(`${date}::${dayType}`)?.find(e => parseRolePart(e.role) === role);
+  const getEntry = (date: string, dayType: string, role: string): CalendarEntry | undefined => {
+    const list = entryLookup.get(`${date}::${dayType}`);
+    return Array.isArray(list) ? list.find(e => parseRolePart(e.role) === role) : undefined;
+  };
 
   // Render a single grid cell
   const renderCell = (
@@ -648,11 +650,15 @@ function EditModal({ entry, sameDay, readers, allUnavailability, onClose, onReas
 
   if (!entry) return null;
 
+  const safeUnavailability = ensureArray<any>(allUnavailability);
+  const safeReaders = ensureArray<Reader>(readers);
+  const safeSameDay = ensureArray<CalendarEntry>(sameDay);
+
   const blockedOnDate = new Set(
-    allUnavailability.filter((u: any) => u.blockedDate === entry.date).map((u: any) => u.readerId)
+    safeUnavailability.filter((u: any) => u.blockedDate === entry.date).map((u: any) => u.readerId)
   );
-  const availableReaders = readers.filter(r => !blockedOnDate.has(r.id));
-  const otherEntries = sameDay.filter(e => e.id !== entry.id);
+  const availableReaders = safeReaders.filter(r => !blockedOnDate.has(r.id));
+  const otherEntries = safeSameDay.filter(e => e.id !== entry.id);
 
   return (
     <Dialog isOpen onClose={onClose} title="Editar Asignación" wide>
@@ -942,7 +948,9 @@ function CalendarTab() {
                                   : <span className="font-medium font-serif text-sm">{entry.readerName}</span>
                                 }
                                 {!entry.isVacant && conflict && (
-                                  <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" title="Misa contigua" />
+                                  <span title="Misa contigua">
+                                    <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                  </span>
                                 )}
                                 {entry.logisticComment && (
                                   <span className="text-xs text-amber-700 italic">({entry.logisticComment})</span>
