@@ -4,7 +4,7 @@
 services:
   # Express API + PostgreSQL
   - type: web
-    name: liturgiaflow-api
+    name: mi-lectura-api
     runtime: node
     plan: free
     buildCommand: >-
@@ -24,7 +24,7 @@ services:
 
   # React PWA (static site)
   - type: web
-    name: liturgiaflow-web
+    name: mi-lectura-web
     runtime: static
     buildCommand: >-
       corepack enable &&
@@ -39,6 +39,6 @@ services:
     envVars:
       - key: VITE_API_URL
         fromService:
-          name: liturgiaflow-api
+          name: mi-lectura-api
           type: web
           envVarKey: RENDER_EXTERNAL_URL
