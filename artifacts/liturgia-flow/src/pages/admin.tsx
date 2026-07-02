@@ -1,8 +1,6 @@
-<<<<<<< HEAD
+
 import React, { useState, useMemo, useEffect } from "react";
-=======
 import React, { useState, useMemo } from "react";
->>>>>>> 88b3f8bfe705968b92536ba2edc20cd99dffdb82
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, Edit2, Trash2, MessageCircle, AlertCircle, Sparkles,
@@ -100,7 +98,7 @@ function parseSchedulePart(roleStr: string): string {
 }
 
 const SEASON_COLORS: Record<string, { bg: string; badge: string; border: string }> = {
-  "Verde":  { bg: "rgba(134,180,134,0.10)", badge: "bg-green-100 text-green-800", border: "border-green-300" },
+  "Verde":  { bg: "rgba(114, 240, 114, 0.1)", badge: "bg-green-100 text-green-800", border: "border-green-300" },
   "Morado": { bg: "rgba(140,100,180,0.10)", badge: "bg-purple-100 text-purple-800", border: "border-purple-300" },
   "Dorado": { bg: "rgba(201,146,42,0.12)", badge: "bg-amber-100 text-amber-800", border: "border-amber-300" },
   "Blanco": { bg: "rgba(220,230,250,0.12)", badge: "bg-blue-50 text-blue-700", border: "border-blue-200" },
@@ -1108,7 +1106,7 @@ function ConfigTab() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editTime, setEditTime] = useState("");
   const [editName, setEditName] = useState("");
-<<<<<<< HEAD
+
   const [configState, setConfigState] = useState({
     generationConfigurations: [] as any[],
     liturgicalFunctions: [] as any[],
@@ -1118,15 +1116,13 @@ function ConfigTab() {
   const [configLoading, setConfigLoading] = useState(true);
   const [savingConfig, setSavingConfig] = useState(false);
   const [newFunctionName, setNewFunctionName] = useState("");
-=======
->>>>>>> 88b3f8bfe705968b92536ba2edc20cd99dffdb82
 
   const handleSave = (id: number) => {
     update.mutate({ id, data: { time: editTime, name: editName } });
     setEditingId(null);
   };
 
-<<<<<<< HEAD
+
   const loadConfig = async () => {
     try {
       setConfigLoading(true);
@@ -1386,7 +1382,7 @@ function ConfigTab() {
           ))}
         </div>
       </Card>
-=======
+
   if (isLoading) return <div className="py-12 flex justify-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>;
 
   return (
@@ -1449,7 +1445,7 @@ function ConfigTab() {
           </Card>
         ))}
       </div>
->>>>>>> 88b3f8bfe705968b92536ba2edc20cd99dffdb82
+
 
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
         <strong>Nota:</strong> Los mensajes de WhatsApp ya reflejan el horario actual. Para actualizar asignaciones existentes al nuevo horario, regenera el calendario.
