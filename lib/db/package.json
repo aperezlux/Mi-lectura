@@ -9,13 +9,9 @@
   },
   "scripts": {
     "push": "drizzle-kit push --config ./drizzle.config.ts",
-<<<<<<< HEAD
     "push-force": "drizzle-kit push --force --config ./drizzle.config.ts",
     "migrate": "drizzle-kit migrate --config ./drizzle.config.ts",
     "seed": "tsx src/seed.ts"
-=======
-    "push-force": "drizzle-kit push --force --config ./drizzle.config.ts"
->>>>>>> 88b3f8bfe705968b92536ba2edc20cd99dffdb82
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
@@ -26,11 +22,7 @@
   "devDependencies": {
     "@types/node": "25.9.0",
     "@types/pg": "^8.18.0",
-<<<<<<< HEAD
     "drizzle-kit": "^0.31.9",
     "tsx": "^4.20.3"
-=======
-    "drizzle-kit": "^0.31.9"
->>>>>>> 88b3f8bfe705968b92536ba2edc20cd99dffdb82
   }
 }
