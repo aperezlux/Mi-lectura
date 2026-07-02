@@ -1,0 +1,286 @@
+{
+  "id": "9e760107-5681-4a02-bda1-628e537a321d",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.readers": {
+      "name": "readers",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "whatsapp": {
+          "name": "whatsapp",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "level": {
+          "name": "level",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'Principiante'"
+        },
+        "pin": {
+          "name": "pin",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.unavailability": {
+      "name": "unavailability",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "reader_id": {
+          "name": "reader_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "blocked_date": {
+          "name": "blocked_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "shift": {
+          "name": "shift",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'all'"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "unavailability_reader_id_readers_id_fk": {
+          "name": "unavailability_reader_id_readers_id_fk",
+          "tableFrom": "unavailability",
+          "tableTo": "readers",
+          "columnsFrom": [
+            "reader_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "unavailability_reader_id_blocked_date_unique": {
+          "name": "unavailability_reader_id_blocked_date_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "reader_id",
+            "blocked_date"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.calendar": {
+      "name": "calendar",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "date": {
+          "name": "date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "schedule_id": {
+          "name": "schedule_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reader_id": {
+          "name": "reader_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "logistic_comment": {
+          "name": "logistic_comment",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_vacant": {
+          "name": "is_vacant",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "is_published": {
+          "name": "is_published",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "liturgical_season": {
+          "name": "liturgical_season",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "version_timestamp": {
+          "name": "version_timestamp",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "calendar_schedule_id_mass_schedules_id_fk": {
+          "name": "calendar_schedule_id_mass_schedules_id_fk",
+          "tableFrom": "calendar",
+          "tableTo": "mass_schedules",
+          "columnsFrom": [
+            "schedule_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "calendar_reader_id_readers_id_fk": {
+          "name": "calendar_reader_id_readers_id_fk",
+          "tableFrom": "calendar",
+          "tableTo": "readers",
+          "columnsFrom": [
+            "reader_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.mass_schedules": {
+      "name": "mass_schedules",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "day_type": {
+          "name": "day_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "time": {
+          "name": "time",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'06:00'"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

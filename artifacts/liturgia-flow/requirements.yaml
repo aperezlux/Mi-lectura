@@ -1,0 +1,19 @@
+packages:
+  "date-fns": "For complex date manipulations and formatting"
+  "framer-motion": "For smooth tab transitions and modal animations"
+  "clsx": "For conditionally joining tailwind classes"
+  "tailwind-merge": "For merging tailwind classes safely"
+  "@hookform/resolvers": "For Zod form validation"
+  "react-hook-form": "For robust form state management"
+
+images:
+  - path: "artifacts/liturgia-flow/public/images/logo.png"
+    description: "Minimalist elegant logo mark for a liturgical scheduling app, featuring a subtle geometric cross and a stylized book or leaf, deep burgundy and gold colors, transparent background"
+    aspect_ratio: "1:1"
+  - path: "artifacts/liturgia-flow/public/images/pattern-bg.png"
+    description: "Subtle, elegant background pattern with abstract geometric stained glass motifs in very light cream and beige tones, low opacity, suitable for a spiritual or liturgical app background"
+    aspect_ratio: "16:9"
+
+notes:
+  - Using pre-generated orval hooks from @workspace/api-client-react
+  - Assuming English locale for date-fns internally, but displaying Spanish text

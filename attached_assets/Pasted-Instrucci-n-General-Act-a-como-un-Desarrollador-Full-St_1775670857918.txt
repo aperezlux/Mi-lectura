@@ -1,0 +1,52 @@
+Instrucción General:
+"Actúa como un Desarrollador Full-Stack Senior. Necesito que actualices/finalices mi PWA de gestión de lectores siguiendo estas especificaciones exactas para asegurar que el sistema sea profesional, estéticamente idéntico a la imagen de referencia y totalmente libre de errores de usuario."
+
+1. Arquitectura de Roles y Asignación Automática:
+Configura el algoritmo de generación (15 días / 1 mes) para que asigne usuarios únicos a cada puesto. Nadie puede repetir el mismo día:
+
+Lunes, Martes, Miércoles, Viernes: 2 puestos (1ª Lectura, Salmo).
+
+Jueves: 3 puestos (1ª Lectura, Salmo, Oraciones).
+
+Sábado P.M. y Domingo P.M.: 5 puestos (Monitor, 1ª Lectura, Salmo, 2ª Lectura, Oraciones).
+
+Domingo A.M.: 7 puestos (2 de Bienvenida, Monitor, 1ª Lectura, Salmo, 2ª Lectura, Oraciones).
+
+2. Reglas de Validación de Conflictos (Blindaje):
+
+Proximidad: Si un usuario es asignado el Sábado P.M., el sistema lo bloquea automáticamente para el Domingo A.M. (descanso obligatorio).
+
+Indisponibilidad: El algoritmo debe cruzar los datos con las fechas bloqueadas por los usuarios.
+
+Manejo de Errores: Si el Admin ingresa un dato inválido o falta un lector, la app debe mostrar un mensaje de alerta suave en lugar de cerrarse. Usa validaciones tipo try/catch y estados de carga (spinners).
+
+3. Interfaz Visual (Estilo imagen_0.png):
+
+Vista Principal: Replicar la tabla de 5 columnas (Jueves, Sábado AM/PM, Domingo AM/PM).
+
+Colores: Fondo rosa claro (#FDF2F8), tipografía elegante tipo Serif, y bordes finos.
+
+Identidad: Encabezado centrado con 'PASTORAL DE LITURGIA' y 'PARROQUIA SANTO CRISTO DE ESQUIPULAS'.
+
+Pie de Página: Franja rosa fija con la cita: "Dios habla cada día; el reto es aprender a escucharlo. ❤️".
+
+Vista de Calendario: Además de la tabla, permite ver las asignaciones en un calendario mensual interactivo donde el Admin pueda tocar un día y ver el detalle.
+
+4. Funciones de Administrador (Portal Admin):
+
+Modificar Horarios: Crear un panel de configuración para cambiar la hora de las misas globalmente.
+
+Edición Táctica: Permitir al admin reasignar o intercambiar personas en los puestos después de que el calendario sea generado pero antes de publicarlo.
+
+Comentarios Logísticos: Campo de texto por día para avisos (ej. 'Llegar 20 min antes').
+
+Sello de Tiempo: Mostrar 'Generado el: [DD/MM/AAAA HH:MM]'.
+
+5. Comunicación y Portal Lector:
+
+Portal Lector: Vista simplificada para que cada usuario marque sus días de inasistencia.
+
+WhatsApp Masivo: Generar el mensaje con formato (emojis y negritas) incluyendo la tabla completa, los comentarios del admin y la fecha de generación.
+
+Instrucción Técnica Final:
+"Asegúrate de que la base de datos (PostgreSQL/Supabase) esté vinculada correctamente y que las rutas de Admin y Lector estén protegidas. La app debe ser PWA para que pueda instalarse en el móvil y funcionar offline para consulta."

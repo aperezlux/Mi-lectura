@@ -1,0 +1,700 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.3.0
+  description: LiturgiaFlow Pro API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: readers
+    description: Reader management
+  - name: unavailability
+    description: Reader unavailability management
+  - name: calendar
+    description: Liturgical calendar and assignments
+  - name: schedules
+    description: Mass schedule configuration
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /readers:
+    get:
+      operationId: getReaders
+      tags: [readers]
+      summary: Get all readers
+      responses:
+        "200":
+          description: List of readers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Reader"
+    post:
+      operationId: createReader
+      tags: [readers]
+      summary: Create a new reader
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReaderInput"
+      responses:
+        "201":
+          description: Created reader
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reader"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /readers/verify-pin:
+    post:
+      operationId: verifyReaderPin
+      tags: [readers]
+      summary: Verify reader PIN for portal access
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyPinInput"
+      responses:
+        "200":
+          description: PIN verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reader"
+        "401":
+          description: Invalid PIN
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Reader not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /readers/{id}:
+    put:
+      operationId: updateReader
+      tags: [readers]
+      summary: Update a reader
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateReaderInput"
+      responses:
+        "200":
+          description: Updated reader
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reader"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteReader
+      tags: [readers]
+      summary: Delete a reader
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /unavailability:
+    get:
+      operationId: getUnavailability
+      tags: [unavailability]
+      summary: Get all unavailability records
+      parameters:
+        - name: readerId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of unavailability records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Unavailability"
+    post:
+      operationId: createUnavailability
+      tags: [unavailability]
+      summary: Block a date for a reader
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUnavailabilityInput"
+      responses:
+        "201":
+          description: Created unavailability
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Unavailability"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /unavailability/{id}:
+    delete:
+      operationId: deleteUnavailability
+      tags: [unavailability]
+      summary: Remove an unavailability record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /schedules:
+    get:
+      operationId: getSchedules
+      tags: [schedules]
+      summary: Get all mass schedule configurations
+      responses:
+        "200":
+          description: List of mass schedules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MassSchedule"
+
+  /schedules/{id}:
+    put:
+      operationId: updateSchedule
+      tags: [schedules]
+      summary: Update a mass schedule time or active state
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateScheduleInput"
+      responses:
+        "200":
+          description: Updated schedule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MassSchedule"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /calendar:
+    get:
+      operationId: getCalendar
+      tags: [calendar]
+      summary: Get calendar assignments
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: publishedOnly
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Calendar assignments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CalendarEntry"
+
+  /calendar/generate:
+    post:
+      operationId: generateCalendar
+      tags: [calendar]
+      summary: Generate calendar assignments for a period
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateCalendarInput"
+      responses:
+        "200":
+          description: Generated assignments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CalendarEntry"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /calendar/publish:
+    post:
+      operationId: publishCalendar
+      tags: [calendar]
+      summary: Publish all draft calendar entries so readers can see them
+      responses:
+        "200":
+          description: Published successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishResult"
+        "400":
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /calendar/stats:
+    get:
+      operationId: getCalendarStats
+      tags: [calendar]
+      summary: Get reader participation statistics
+      responses:
+        "200":
+          description: Reader stats
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReaderStat"
+
+  /calendar/swap:
+    post:
+      operationId: swapCalendarEntries
+      tags: [calendar]
+      summary: Swap reader assignments between two calendar entries
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SwapEntriesInput"
+      responses:
+        "200":
+          description: Swapped entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CalendarEntry"
+        "400":
+          description: Conflict or validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /calendar/{id}:
+    put:
+      operationId: updateCalendarEntry
+      tags: [calendar]
+      summary: Update a calendar entry (reassign reader)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCalendarEntryInput"
+      responses:
+        "200":
+          description: Updated calendar entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalendarEntry"
+        "400":
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteCalendarEntry
+      tags: [calendar]
+      summary: Delete a calendar entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        details:
+          type: string
+      required:
+        - error
+
+    Reader:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        whatsapp:
+          type: string
+        level:
+          type: string
+          enum: [Principiante, Experto]
+        hasPin:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - whatsapp
+        - level
+        - hasPin
+        - createdAt
+
+    CreateReaderInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        whatsapp:
+          type: string
+          minLength: 7
+          maxLength: 20
+        level:
+          type: string
+          enum: [Principiante, Experto]
+        pin:
+          type: string
+          minLength: 4
+          maxLength: 20
+      required:
+        - name
+        - whatsapp
+        - level
+
+    UpdateReaderInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        whatsapp:
+          type: string
+          minLength: 7
+          maxLength: 20
+        level:
+          type: string
+          enum: [Principiante, Experto]
+        pin:
+          type: string
+          minLength: 4
+          maxLength: 20
+
+    VerifyPinInput:
+      type: object
+      properties:
+        readerId:
+          type: integer
+        pin:
+          type: string
+      required:
+        - readerId
+        - pin
+
+    UnavailabilityShift:
+      type: string
+      enum: [morning, evening, all]
+
+    Unavailability:
+      type: object
+      properties:
+        id:
+          type: integer
+        readerId:
+          type: integer
+        blockedDate:
+          type: string
+          format: date
+        readerName:
+          type: string
+        shift:
+          $ref: "#/components/schemas/UnavailabilityShift"
+      required:
+        - id
+        - readerId
+        - blockedDate
+        - shift
+
+    CreateUnavailabilityInput:
+      type: object
+      properties:
+        readerId:
+          type: integer
+        blockedDate:
+          type: string
+          format: date
+        shift:
+          $ref: "#/components/schemas/UnavailabilityShift"
+      required:
+        - readerId
+        - blockedDate
+
+    MassSchedule:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        dayType:
+          type: string
+          enum: [weekday, thursday_am, thursday_pm, saturday_am, saturday_pm, sunday_am, sunday_pm]
+        time:
+          type: string
+        isActive:
+          type: boolean
+        roles:
+          type: array
+          items:
+            type: string
+        sortOrder:
+          type: integer
+      required:
+        - id
+        - name
+        - dayType
+        - time
+        - isActive
+        - roles
+        - sortOrder
+
+    UpdateScheduleInput:
+      type: object
+      properties:
+        time:
+          type: string
+          pattern: "^([01]\\d|2[0-3]):[0-5]\\d$"
+        isActive:
+          type: boolean
+        name:
+          type: string
+
+    CalendarEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        date:
+          type: string
+          format: date
+        role:
+          type: string
+        scheduleId:
+          type: integer
+        scheduleName:
+          type: string
+        scheduleTime:
+          type: string
+        readerId:
+          type: integer
+        readerName:
+          type: string
+        logisticComment:
+          type: string
+        isVacant:
+          type: boolean
+        isPublished:
+          type: boolean
+        versionTimestamp:
+          type: string
+          format: date-time
+        liturgicalSeason:
+          type: string
+      required:
+        - id
+        - date
+        - role
+        - isVacant
+        - isPublished
+
+    GenerateCalendarInput:
+      type: object
+      properties:
+        startDate:
+          type: string
+          format: date
+        period:
+          type: string
+          enum: ["15days", "1month"]
+      required:
+        - startDate
+        - period
+
+    UpdateCalendarEntryInput:
+      type: object
+      properties:
+        readerId:
+          type: integer
+          nullable: true
+        logisticComment:
+          type: string
+          nullable: true
+        isVacant:
+          type: boolean
+
+    SwapEntriesInput:
+      type: object
+      properties:
+        entryIdA:
+          type: integer
+        entryIdB:
+          type: integer
+      required:
+        - entryIdA
+        - entryIdB
+
+    PublishResult:
+      type: object
+      properties:
+        published:
+          type: integer
+        publishedAt:
+          type: string
+          format: date-time
+      required:
+        - published
+        - publishedAt
+
+    ReaderStat:
+      type: object
+      properties:
+        readerId:
+          type: integer
+        readerName:
+          type: string
+        totalAssignments:
+          type: integer
+        lastRole:
+          type: string
+        lastAssignedDate:
+          type: string
+        debtScore:
+          type: number
+      required:
+        - readerId
+        - readerName
+        - totalAssignments
+        - debtScore
