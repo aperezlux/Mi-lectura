@@ -4,6 +4,9 @@
   "license": "MIT",
   "private": true,
   "packageManager": "pnpm@11.2.2",
+  "engines": {
+    "node": ">=20"
+  },
   "workspaces": [
     "artifacts/*",
     "lib/*",
@@ -14,14 +17,10 @@
     "typecheck:libs": "tsc --build",
     "typecheck": "npm run typecheck:libs && npm run typecheck --workspaces --if-present",
     "db:migrate": "pnpm --filter @workspace/db migrate",
-    "db:seed": "pnpm --filter @workspace/db seed",
-    "typecheck": "npm run typecheck:libs && npm run typecheck --workspaces --if-present"
+    "db:seed": "pnpm --filter @workspace/db seed"
   },
   "devDependencies": {
-    "@rollup/rollup-win32-x64-msvc": "^4.6.0",
-    "@tailwindcss/oxide-win32-x64-msvc": "^4.3.0",
     "dotenv": "^17.4.2",
-    "lightningcss-win32-x64-msvc": "^1.32.0",
     "prettier": "^3.8.1",
     "typescript": "~5.9.2"
   }

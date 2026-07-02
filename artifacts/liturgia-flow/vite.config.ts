@@ -3,7 +3,8 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 import path from "path";
-import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+
+const isDev = process.env.NODE_ENV !== "production";
 
 const rawPort = process.env.PORT ?? "3000";
 const port = Number(rawPort);
@@ -19,7 +20,9 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    runtimeErrorOverlay(),
+    ...(isDev
+      ? [(await import("@replit/vite-plugin-runtime-error-modal")).default()]
+      : []),
     VitePWA({
       registerType: "autoUpdate",
       injectRegister: "auto",
@@ -58,7 +61,7 @@ export default defineConfig({
         enabled: false,
       },
     }),
-    ...(process.env.NODE_ENV !== "production" &&
+    ...(isDev &&
     process.env.REPL_ID !== undefined
       ? [
           await import("@replit/vite-plugin-cartographer").then((m) =>

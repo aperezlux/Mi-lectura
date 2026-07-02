@@ -7,16 +7,14 @@ services:
     name: mi-lectura-api
     runtime: node
     plan: free
-    buildCommand: >-
-      corepack enable &&
-      corepack prepare pnpm@latest --activate &&
-      pnpm install &&
-      pnpm --filter @workspace/api-server run build
+    buildCommand: pnpm install && pnpm --filter @workspace/api-server run build
     startCommand: pnpm --filter @workspace/api-server run start
     healthCheckPath: /api/healthz
     envVars:
       - key: NODE_VERSION
         value: "24"
+      - key: NODE_ENV
+        value: production
       - key: DATABASE_URL
         sync: false
       - key: PORT
@@ -28,9 +26,9 @@ services:
     runtime: static
     buildCommand: >-
       corepack enable &&
-      corepack prepare pnpm@latest --activate &&
+      corepack prepare pnpm@11.2.2 --activate &&
       pnpm install &&
-      PORT=3000 BASE_PATH=/ pnpm --filter @workspace/liturgia-flow run build
+      PORT=3000 BASE_PATH=/ NODE_ENV=production pnpm --filter @workspace/liturgia-flow run build
     staticPublishPath: artifacts/liturgia-flow/dist/public
     routes:
       - type: rewrite

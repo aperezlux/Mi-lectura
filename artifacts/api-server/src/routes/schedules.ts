@@ -3,37 +3,19 @@ import { db } from "@workspace/db";
 import {
   massSchedulesTable,
   updateScheduleSchema,
-<<<<<<< HEAD
   ROLES_BY_DAY_TYPE,
   generationConfigurationsTable,
   liturgicalFunctionsTable,
   generationFunctionAssignmentsTable,
   appSettingsTable,
-=======
-  DEFAULT_SCHEDULES,
-  ROLES_BY_DAY_TYPE,
->>>>>>> 88b3f8bfe705968b92536ba2edc20cd99dffdb82
   type DayType,
 } from "@workspace/db/schema";
 import { eq, asc } from "drizzle-orm";
 
 const router: IRouter = Router();
 
-<<<<<<< HEAD
 router.get("/schedules", async (req, res) => {
   try {
-=======
-async function ensureDefaultSchedules() {
-  const existing = await db.select().from(massSchedulesTable);
-  if (existing.length === 0) {
-    await db.insert(massSchedulesTable).values(DEFAULT_SCHEDULES);
-  }
-}
-
-router.get("/schedules", async (req, res) => {
-  try {
-    await ensureDefaultSchedules();
->>>>>>> 88b3f8bfe705968b92536ba2edc20cd99dffdb82
     const schedules = await db
       .select()
       .from(massSchedulesTable)
@@ -50,7 +32,6 @@ router.get("/schedules", async (req, res) => {
   }
 });
 
-<<<<<<< HEAD
 router.get("/config", async (req, res) => {
   try {
     const generationConfigurations = await db
@@ -145,8 +126,6 @@ router.put("/config", async (req, res) => {
   }
 });
 
-=======
->>>>>>> 88b3f8bfe705968b92536ba2edc20cd99dffdb82
 router.put("/schedules/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);

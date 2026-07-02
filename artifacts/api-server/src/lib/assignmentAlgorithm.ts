@@ -5,17 +5,12 @@ import {
   calendarTable,
   massSchedulesTable,
   ROLES_BY_DAY_TYPE,
-<<<<<<< HEAD
+  DEFAULT_SCHEDULES,
   MORNING_DAY_TYPES,
   EVENING_DAY_TYPES,
   generationConfigurationsTable,
   liturgicalFunctionsTable,
   generationFunctionAssignmentsTable,
-=======
-  DEFAULT_SCHEDULES,
-  MORNING_DAY_TYPES,
-  EVENING_DAY_TYPES,
->>>>>>> 88b3f8bfe705968b92536ba2edc20cd99dffdb82
   type DayType,
 } from "@workspace/db/schema";
 import { eq, gte, lte, and, sql, asc, desc, isNotNull } from "drizzle-orm";
@@ -81,12 +76,13 @@ function isShiftBlocked(shift: string, dayType: DayType): boolean {
 }
 
 async function ensureDefaultSchedules() {
-<<<<<<< HEAD
-  await db.select().from(massSchedulesTable).limit(1);
+  const existing = await db.select().from(massSchedulesTable).limit(1);
+  if (existing.length === 0) {
+    await db.insert(massSchedulesTable).values(DEFAULT_SCHEDULES);
+  }
 }
 
 async function getConfiguredRolesByDayType(): Promise<Record<DayType, string[]>> {
-
   const configurations = await db
     .select()
     .from(generationConfigurationsTable)
@@ -125,12 +121,6 @@ async function getConfiguredRolesByDayType(): Promise<Record<DayType, string[]>>
   }
 
   return rolesByDayType;
-=======
-  const existing = await db.select().from(massSchedulesTable);
-  if (existing.length === 0) {
-    await db.insert(massSchedulesTable).values(DEFAULT_SCHEDULES);
-  }
->>>>>>> 88b3f8bfe705968b92536ba2edc20cd99dffdb82
 }
 
 // Extract the role name part (before " - ")
@@ -150,10 +140,7 @@ export async function generateAssignments(
   liturgicalSeason: string;
 }>> {
   await ensureDefaultSchedules();
-<<<<<<< HEAD
   const rolesByDayType = await getConfiguredRolesByDayType();
-=======
->>>>>>> 88b3f8bfe705968b92536ba2edc20cd99dffdb82
 
   const activeSchedules = await db
     .select()
@@ -173,11 +160,7 @@ export async function generateAssignments(
       return activeSchedules
         .filter((s) => dayTypes.includes(s.dayType as DayType))
         .flatMap((schedule) =>
-<<<<<<< HEAD
           (rolesByDayType[schedule.dayType as DayType] ?? []).map((role) => ({
-=======
-          (ROLES_BY_DAY_TYPE[schedule.dayType as DayType] ?? []).map((role) => ({
->>>>>>> 88b3f8bfe705968b92536ba2edc20cd99dffdb82
             date,
             role: `${role} - ${schedule.name} ${schedule.time}`,
             scheduleId: schedule.id,
@@ -293,11 +276,7 @@ export async function generateAssignments(
 
     for (const schedule of daySchedules) {
       const dayType = schedule.dayType as DayType;
-<<<<<<< HEAD
       const roles = rolesByDayType[dayType] ?? [];
-=======
-      const roles = ROLES_BY_DAY_TYPE[dayType] ?? [];
->>>>>>> 88b3f8bfe705968b92536ba2edc20cd99dffdb82
 
       let proximityBlocked = new Set<number>();
       if (dayType === "sunday_am") {

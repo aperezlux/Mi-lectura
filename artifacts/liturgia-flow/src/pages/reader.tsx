@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-﻿import React, { useState, useEffect } from "react";
-=======
-﻿import React, { useState } from "react";
->>>>>>> 88b3f8bfe705968b92536ba2edc20cd99dffdb82
+import React, { useState, useEffect } from "react";
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval,
   isToday, addMonths, subMonths, getDay
@@ -10,7 +6,7 @@ import {
 import { es } from "date-fns/locale";
 import { motion, AnimatePresence } from "framer-motion";
 import { useReaders, useUnavailability, useUnavailabilityMutations, useCalendar } from "@/hooks/use-liturgia";
-import { cn, formatDate, ensureArray } from "@/lib/utils";
+import { cn, formatDate, ensureArray, apiUrl } from "@/lib/utils";
 import {
   Calendar as CalendarIcon, UserCircle, AlertCircle,
   ChevronLeft, ChevronRight, CheckCircle, Clock,
@@ -290,16 +286,10 @@ interface AssignmentsViewProps {
   readerId: number;
   readerName: string;
   readerLevel: string;
-<<<<<<< HEAD
   availabilityVisible: boolean;
 }
 
 function AssignmentsView({ readerId, readerName, readerLevel, availabilityVisible }: AssignmentsViewProps) {
-=======
-}
-
-function AssignmentsView({ readerId, readerName, readerLevel }: AssignmentsViewProps) {
->>>>>>> 88b3f8bfe705968b92536ba2edc20cd99dffdb82
   const today = format(new Date(), "yyyy-MM-dd");
   const { data: calendar = [] } = useCalendar({ publishedOnly: true });
   const [showCalendar, setShowCalendar] = useState(false);
@@ -438,7 +428,6 @@ function AssignmentsView({ readerId, readerName, readerLevel }: AssignmentsViewP
       )}
 
       {/* Unavailability calendar toggle */}
-<<<<<<< HEAD
       {availabilityVisible && (
         <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
           <button
@@ -468,46 +457,13 @@ function AssignmentsView({ readerId, readerName, readerLevel }: AssignmentsViewP
           </AnimatePresence>
         </div>
       )}
-=======
-      <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
-        <button
-          onClick={() => setShowCalendar(!showCalendar)}
-          className="w-full px-5 py-4 flex items-center gap-2 text-left hover:bg-muted/20 transition-colors"
-        >
-          <CalendarIcon className="w-5 h-5 text-destructive shrink-0" />
-          <div className="flex-1">
-            <span className="font-medium">Mis días no disponibles</span>
-            <p className="text-xs text-muted-foreground mt-0.5">Marca días en los que no podrás asistir</p>
-          </div>
-          <ChevronRight className={cn("w-5 h-5 text-muted-foreground transition-transform", showCalendar && "rotate-90")} />
-        </button>
-        <AnimatePresence>
-          {showCalendar && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden"
-            >
-              <div className="px-5 pb-5 border-t border-border pt-4">
-                <UnavailCalendar selectedReaderId={readerId} />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
->>>>>>> 88b3f8bfe705968b92536ba2edc20cd99dffdb82
     </div>
   );
 }
 
 // ─── Phase 1: Pre-publication view ───────────────────────────────────────────
 
-<<<<<<< HEAD
 function PrePublicationView({ readerId, readerName, availabilityVisible }: { readerId: number; readerName: string; availabilityVisible: boolean }) {
-=======
-function PrePublicationView({ readerId, readerName }: { readerId: number; readerName: string }) {
->>>>>>> 88b3f8bfe705968b92536ba2edc20cd99dffdb82
   return (
     <div className="space-y-6">
       <motion.div
@@ -525,7 +481,6 @@ function PrePublicationView({ readerId, readerName }: { readerId: number; reader
         </p>
       </motion.div>
 
-<<<<<<< HEAD
       {availabilityVisible && (
         <div className="bg-white rounded-2xl border border-border shadow-sm p-6">
           <h3 className="font-serif text-lg text-primary flex items-center gap-2 mb-4">
@@ -538,18 +493,6 @@ function PrePublicationView({ readerId, readerName }: { readerId: number; reader
           <UnavailCalendar selectedReaderId={readerId} />
         </div>
       )}
-=======
-      <div className="bg-white rounded-2xl border border-border shadow-sm p-6">
-        <h3 className="font-serif text-lg text-primary flex items-center gap-2 mb-4">
-          <CalendarIcon className="w-5 h-5 text-destructive" />
-          Mis días no disponibles
-        </h3>
-        <p className="text-sm text-muted-foreground mb-5">
-          Toca los días en que <strong>NO</strong> podrás asistir. El administrador lo tomará en cuenta al generar el calendario.
-        </p>
-        <UnavailCalendar selectedReaderId={readerId} />
-      </div>
->>>>>>> 88b3f8bfe705968b92536ba2edc20cd99dffdb82
     </div>
   );
 }
@@ -562,10 +505,7 @@ export default function ReaderPortal() {
   const [pin, setPin] = useState("");
   const [authenticated, setAuthenticated] = useState(false);
   const [pinError, setPinError] = useState("");
-<<<<<<< HEAD
   const [availabilityVisible, setAvailabilityVisible] = useState(true);
-=======
->>>>>>> 88b3f8bfe705968b92536ba2edc20cd99dffdb82
   const { data: publishedCalendar = [] } = useCalendar({ publishedOnly: true });
   const verifyPin = useVerifyReaderPin();
 
@@ -582,11 +522,10 @@ export default function ReaderPortal() {
     verifyPin.reset();
   };
 
-<<<<<<< HEAD
   useEffect(() => {
     const loadAvailabilityVisibility = async () => {
       try {
-        const response = await fetch("/api/config");
+        const response = await fetch(apiUrl("/api/config"));
         if (!response.ok) return;
         const data = await response.json();
         const visible = data?.appSettings?.reader_availability_visible !== "false";
@@ -599,8 +538,6 @@ export default function ReaderPortal() {
     void loadAvailabilityVisibility();
   }, []);
 
-=======
->>>>>>> 88b3f8bfe705968b92536ba2edc20cd99dffdb82
   const handleVerifyPin = () => {
     if (!selectedReaderId || !pin.trim()) return;
     setPinError("");
@@ -772,19 +709,13 @@ export default function ReaderPortal() {
                 readerId={selectedReaderId!}
                 readerName={selectedReader!.name}
                 readerLevel={selectedReader!.level}
-<<<<<<< HEAD
                 availabilityVisible={availabilityVisible}
-=======
->>>>>>> 88b3f8bfe705968b92536ba2edc20cd99dffdb82
               />
             ) : (
               <PrePublicationView
                 readerId={selectedReaderId!}
                 readerName={selectedReader!.name}
-<<<<<<< HEAD
                 availabilityVisible={availabilityVisible}
-=======
->>>>>>> 88b3f8bfe705968b92536ba2edc20cd99dffdb82
               />
             )}
           </motion.div>
