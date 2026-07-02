@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import React, { useState, useMemo, useEffect } from "react";
+=======
+import React, { useState, useMemo } from "react";
+>>>>>>> 88b3f8bfe705968b92536ba2edc20cd99dffdb82
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, Edit2, Trash2, MessageCircle, AlertCircle, Sparkles,
@@ -1104,6 +1108,7 @@ function ConfigTab() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editTime, setEditTime] = useState("");
   const [editName, setEditName] = useState("");
+<<<<<<< HEAD
   const [configState, setConfigState] = useState({
     generationConfigurations: [] as any[],
     liturgicalFunctions: [] as any[],
@@ -1113,12 +1118,15 @@ function ConfigTab() {
   const [configLoading, setConfigLoading] = useState(true);
   const [savingConfig, setSavingConfig] = useState(false);
   const [newFunctionName, setNewFunctionName] = useState("");
+=======
+>>>>>>> 88b3f8bfe705968b92536ba2edc20cd99dffdb82
 
   const handleSave = (id: number) => {
     update.mutate({ id, data: { time: editTime, name: editName } });
     setEditingId(null);
   };
 
+<<<<<<< HEAD
   const loadConfig = async () => {
     try {
       setConfigLoading(true);
@@ -1378,6 +1386,70 @@ function ConfigTab() {
           ))}
         </div>
       </Card>
+=======
+  if (isLoading) return <div className="py-12 flex justify-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>;
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-6">
+      <div>
+        <h2 className="text-2xl font-serif text-primary flex items-center gap-2">
+          <Settings className="w-6 h-6 text-accent" /> Configuración de Horarios
+        </h2>
+        <p className="text-muted-foreground mt-2 text-sm">
+          Modifica la hora de cada misa y activa o desactiva jornadas. Los cambios se reflejan automáticamente en los mensajes de WhatsApp del calendario ya generado y en futuras generaciones.
+        </p>
+      </div>
+
+      <div className="space-y-3">
+        {schedules.map((s: MassSchedule) => (
+          <Card key={s.id} className={cn("p-4 transition-opacity", !s.isActive && "opacity-60")}>
+            <div className="flex items-start gap-3">
+              <button
+                onClick={() => update.mutate({ id: s.id, data: { isActive: !s.isActive } })}
+                title={s.isActive ? "Desactivar" : "Activar"}
+                className={cn("mt-1 shrink-0 w-10 h-6 rounded-full transition-colors border relative", s.isActive ? "bg-primary/20 border-primary/40" : "bg-muted border-border")}
+              >
+                <span className={cn("absolute top-1 left-1 w-4 h-4 rounded-full transition-transform", s.isActive ? "bg-primary translate-x-4" : "bg-muted-foreground")} />
+              </button>
+              <div className="flex-1 min-w-0">
+                {editingId === s.id ? (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs text-muted-foreground font-medium">Nombre</label>
+                      <Input value={editName} onChange={e => setEditName(e.target.value)} className="h-10 mt-1" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground font-medium">Hora (HH:MM)</label>
+                      <Input type="time" value={editTime} onChange={e => setEditTime(e.target.value)} className="h-10 mt-1 w-40" />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => handleSave(s.id)} disabled={update.isPending}>Guardar</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>Cancelar</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-semibold">{s.name}</h4>
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg font-mono font-bold text-primary">{s.time}</span>
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => { setEditingId(s.id); setEditTime(s.time); setEditName(s.name); }}>
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {(s.roles ?? []).map((role: string) => <Badge key={role} variant="outline" className="text-xs">{role}</Badge>)}
+                    </div>
+                    {!s.isActive && <p className="text-xs text-amber-700 mt-1 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Misa desactivada.</p>}
+                  </>
+                )}
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+>>>>>>> 88b3f8bfe705968b92536ba2edc20cd99dffdb82
 
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
         <strong>Nota:</strong> Los mensajes de WhatsApp ya reflejan el horario actual. Para actualizar asignaciones existentes al nuevo horario, regenera el calendario.

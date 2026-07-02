@@ -8,6 +8,7 @@
       "when": 1779226933176,
       "tag": "0000_magical_captain_cross",
       "breakpoints": true
+<<<<<<< HEAD
     },
     {
       "idx": 1,
@@ -15,6 +16,8 @@
       "when": 1779226934000,
       "tag": "0001_add_config_tables",
       "breakpoints": true
+=======
+>>>>>>> 88b3f8bfe705968b92536ba2edc20cd99dffdb82
     }
   ]
 }
