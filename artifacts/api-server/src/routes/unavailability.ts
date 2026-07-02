@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { unavailabilityTable, readersTable, insertUnavailabilitySchema } from "@workspace/db/schema";
+import { unavailabilityTable, readersTable, insertUnavailabilitySchema, appSettingsTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 
 const router: IRouter = Router();
@@ -13,8 +13,26 @@ const SELECTED_FIELDS = {
   readerName: readersTable.name,
 };
 
+async function isReaderAvailabilityVisible(): Promise<boolean> {
+  const rows = await db
+    .select({ value: appSettingsTable.value })
+    .from(appSettingsTable)
+    .where(eq(appSettingsTable.key, "reader_availability_visible"))
+    .limit(1);
+
+  // If missing, keep existing default behavior (visible).
+  const value = rows[0]?.value;
+  return value == null ? true : value !== "false";
+}
+
 router.get("/unavailability", async (req, res) => {
   try {
+    const visible = await isReaderAvailabilityVisible();
+    if (!visible) {
+      res.json([]);
+      return;
+    }
+
     const readerIdParam = req.query.readerId;
 
     if (readerIdParam) {
@@ -43,6 +61,12 @@ router.get("/unavailability", async (req, res) => {
 
 router.post("/unavailability", async (req, res) => {
   try {
+    const visible = await isReaderAvailabilityVisible();
+    if (!visible) {
+      res.status(403).json({ error: "Indisponibilidad deshabilitada por el administrador" });
+      return;
+    }
+
     const parsed = insertUnavailabilitySchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Datos inválidos", details: parsed.error.message });
@@ -94,6 +118,12 @@ router.post("/unavailability", async (req, res) => {
 
 router.delete("/unavailability/:id", async (req, res) => {
   try {
+    const visible = await isReaderAvailabilityVisible();
+    if (!visible) {
+      res.status(403).json({ error: "Indisponibilidad deshabilitada por el administrador" });
+      return;
+    }
+
     const id = parseInt(req.params.id);
     if (isNaN(id)) {
       res.status(400).json({ error: "ID inválido" });

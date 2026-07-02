@@ -68,10 +68,20 @@ function dayTypesForDayOfWeek(dow: number): DayType[] {
 }
 
 // Is a reader's shift blocking them from a specific day type?
-function isShiftBlocked(shift: string, dayType: DayType): boolean {
+function isShiftBlocked(shift: string, dayType: string): boolean {
   if (shift === "all") return true;
-  if (shift === "morning" && (MORNING_DAY_TYPES as string[]).includes(dayType)) return true;
-  if (shift === "evening" && (EVENING_DAY_TYPES as string[]).includes(dayType)) return true;
+  if (shift === "morning") {
+    return (
+      (MORNING_DAY_TYPES as string[]).includes(dayType) ||
+      dayType.endsWith("_am")
+    );
+  }
+  if (shift === "evening") {
+    return (
+      (EVENING_DAY_TYPES as string[]).includes(dayType) ||
+      dayType.endsWith("_pm")
+    );
+  }
   return false;
 }
 
@@ -82,11 +92,64 @@ async function ensureDefaultSchedules() {
   }
 }
 
-async function getConfiguredRolesByDayType(): Promise<Record<DayType, string[]>> {
+function normalizeLabel(input: string): string {
+  return input
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+}
+
+function legacyDowMaskForDayType(dayType: string): Set<number> {
+  if (dayType === "weekday") return new Set([1, 2, 3, 5]); // Mon/Tue/Wed/Fri
+  if (dayType.startsWith("thursday_")) return new Set([4]);
+  if (dayType.startsWith("saturday_")) return new Set([6]);
+  if (dayType.startsWith("sunday_")) return new Set([0]);
+  return new Set([0, 1, 2, 3, 4, 5, 6]); // Unknown -> disable everywhere fallback
+}
+
+function dowMaskFromConfigLabel(label: string, dayType: string): Set<number> {
+  const norm = normalizeLabel(label);
+  const result = new Set<number>();
+
+  // Full weekday names
+  if (/\blunes\b/.test(norm)) result.add(1);
+  if (/\bmartes\b/.test(norm)) result.add(2);
+  if (/\bmiercol/.test(norm)) result.add(3);
+  if (/\bjueves\b/.test(norm)) result.add(4);
+  if (/\bviernes\b/.test(norm)) result.add(5);
+  if (/\bsabado\b/.test(norm)) result.add(6);
+  if (/\bdomingo\b/.test(norm)) result.add(0);
+
+  // Abbreviations / variants (tolerant parsing)
+  if (/\blun\b/.test(norm)) result.add(1);
+  if (/\bmar\b/.test(norm)) result.add(2);
+  if (/\bmie\b/.test(norm)) result.add(3);
+  if (/\bju[eé]\b/.test(norm)) result.add(4);
+  if (/\bvie\b/.test(norm)) result.add(5);
+  if (/\bsab\b/.test(norm)) result.add(6);
+
+  // If it's a "Lunes a Viernes" like label, include full Mon-Fri weekdays.
+  // This fixes the observed "Monday disable disables entire weekday range".
+  if (/\blunes\b/.test(norm) && /\bviernes\b/.test(norm) && dayType === "weekday") {
+    return new Set([1, 2, 3, 5]);
+  }
+
+  if (result.size === 0) return legacyDowMaskForDayType(dayType);
+  return result;
+}
+
+async function getConfiguredRolesByDayType(): Promise<{
+  rolesByDayType: Record<string, string[]>;
+  disabledDowByDayType: Record<string, Set<number>>;
+}> {
   const configurations = await db
-    .select()
+    .select({
+      id: generationConfigurationsTable.id,
+      dayType: generationConfigurationsTable.dayType,
+      label: generationConfigurationsTable.label,
+      isEnabled: generationConfigurationsTable.isEnabled,
+    })
     .from(generationConfigurationsTable)
-    .where(eq(generationConfigurationsTable.isEnabled, true))
     .orderBy(asc(generationConfigurationsTable.sortOrder), asc(generationConfigurationsTable.dayType));
 
   const assignments = await db
@@ -94,15 +157,15 @@ async function getConfiguredRolesByDayType(): Promise<Record<DayType, string[]>>
       generationConfigurationId: generationFunctionAssignmentsTable.generationConfigurationId,
       functionName: liturgicalFunctionsTable.name,
       sortOrder: generationFunctionAssignmentsTable.sortOrder,
-      isActive: generationFunctionAssignmentsTable.isActive,
     })
     .from(generationFunctionAssignmentsTable)
     .innerJoin(liturgicalFunctionsTable, eq(generationFunctionAssignmentsTable.functionId, liturgicalFunctionsTable.id))
     .where(eq(generationFunctionAssignmentsTable.isActive, true));
 
-  const rolesByDayType = {} as Record<DayType, string[]>;
-  const assignmentsByConfig = new Map<number, Array<{ functionName: string; sortOrder: number }>>();
+  const rolesByDayType: Record<string, string[]> = {};
+  const disabledDowByDayType: Record<string, Set<number>> = {};
 
+  const assignmentsByConfig = new Map<number, Array<{ functionName: string; sortOrder: number }>>();
   for (const assignment of assignments) {
     const current = assignmentsByConfig.get(assignment.generationConfigurationId) ?? [];
     current.push({ functionName: assignment.functionName, sortOrder: assignment.sortOrder });
@@ -110,17 +173,21 @@ async function getConfiguredRolesByDayType(): Promise<Record<DayType, string[]>>
   }
 
   for (const config of configurations) {
-    const dayType = config.dayType as DayType;
+    const dayType = config.dayType;
     const configuredRoles = (assignmentsByConfig.get(config.id) ?? [])
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((entry) => entry.functionName);
 
     rolesByDayType[dayType] = configuredRoles.length > 0
       ? configuredRoles
-      : (ROLES_BY_DAY_TYPE[dayType] ?? []);
+      : (ROLES_BY_DAY_TYPE[dayType as DayType] ?? []);
+
+    if (!config.isEnabled) {
+      disabledDowByDayType[dayType] = dowMaskFromConfigLabel(config.label, dayType);
+    }
   }
 
-  return rolesByDayType;
+  return { rolesByDayType, disabledDowByDayType };
 }
 
 // Extract the role name part (before " - ")
@@ -140,7 +207,7 @@ export async function generateAssignments(
   liturgicalSeason: string;
 }>> {
   await ensureDefaultSchedules();
-  const rolesByDayType = await getConfiguredRolesByDayType();
+  const { rolesByDayType, disabledDowByDayType } = await getConfiguredRolesByDayType();
 
   const activeSchedules = await db
     .select()
@@ -159,16 +226,19 @@ export async function generateAssignments(
       const dayTypes = dayTypesForDayOfWeek(dow);
       return activeSchedules
         .filter((s) => dayTypes.includes(s.dayType as DayType))
-        .flatMap((schedule) =>
-          (rolesByDayType[schedule.dayType as DayType] ?? []).map((role) => ({
+        .flatMap((schedule) => {
+          const scheduleDayType = schedule.dayType as string;
+          const isDisabledForThisDow = disabledDowByDayType[scheduleDayType]?.has(dow) ?? false;
+          const roles = isDisabledForThisDow ? [] : (rolesByDayType[scheduleDayType] ?? []);
+          return roles.map((role) => ({
             date,
             role: `${role} - ${schedule.name} ${schedule.time}`,
             scheduleId: schedule.id,
             readerId: null,
             isVacant: true,
             liturgicalSeason: getLiturgicalSeason(date),
-          }))
-        );
+          }));
+        });
     });
   }
 
@@ -275,8 +345,9 @@ export async function generateAssignments(
     const currentWeek = getISOWeek(date);
 
     for (const schedule of daySchedules) {
-      const dayType = schedule.dayType as DayType;
-      const roles = rolesByDayType[dayType] ?? [];
+      const dayType = schedule.dayType as string;
+      const isDisabledForThisDow = disabledDowByDayType[dayType]?.has(dow) ?? false;
+      const roles = isDisabledForThisDow ? [] : (rolesByDayType[dayType] ?? []);
 
       let proximityBlocked = new Set<number>();
       if (dayType === "sunday_am") {
